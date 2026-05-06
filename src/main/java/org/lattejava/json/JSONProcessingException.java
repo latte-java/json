@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025-2026 Latte Java
+ * Copyright (c) 2025-2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
 package org.lattejava.json;
