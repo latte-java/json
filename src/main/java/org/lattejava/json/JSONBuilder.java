@@ -4,11 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
+import module java.base;
 
 /**
  * Fluent builder for JSON objects. Writes UTF-8 bytes directly to a {@link ByteArrayOutputStream};
@@ -19,6 +15,10 @@ import java.nio.charset.StandardCharsets;
  * <p>By default null values and {@code null}-passed raw JSON members are omitted, matching
  * {@link JSON @JSON}'s {@code omitNulls = true} default. Pass {@code false} to the constructor to emit
  * them faithfully.
+ *
+ * <p><b>Single-use:</b> a builder instance must be finalized exactly once. Calling
+ * {@link #build()} or {@link #buildBytes()} more than once on the same instance produces
+ * malformed JSON. Generated companion code constructs a fresh builder per serialization call.
  *
  * @author Brian Pontarelli
  */
@@ -60,13 +60,13 @@ public final class JSONBuilder {
     return this;
   }
 
+  public String build() {
+    return new String(buildBytes(), StandardCharsets.UTF_8);
+  }
+
   public byte[] buildBytes() {
     out.write('}');
     return out.toByteArray();
-  }
-
-  public String build() {
-    return new String(buildBytes(), StandardCharsets.UTF_8);
   }
 
   public JSONBuilder decimal(String key, BigDecimal value) {
@@ -131,11 +131,7 @@ public final class JSONBuilder {
   }
 
   private void writeRaw(String literal) {
-    try {
-      out.write(literal.getBytes(StandardCharsets.UTF_8));
-    } catch (IOException e) {
-      throw new JSONProcessingException("Serialization I/O failure", e);
-    }
+    out.writeBytes(literal.getBytes(StandardCharsets.UTF_8));
   }
 
   private void writeString(String s) {
