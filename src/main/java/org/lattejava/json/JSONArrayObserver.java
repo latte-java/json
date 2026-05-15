@@ -4,8 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Observer driven by {@link JSONParser} during deserialization of a JSON array. Element callbacks are

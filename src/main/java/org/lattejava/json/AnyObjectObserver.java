@@ -4,10 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import module java.base;
 
 /**
  * {@link JSONObserver} that accumulates every key/value pair into a {@link LinkedHashMap} of the value's

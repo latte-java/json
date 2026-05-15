@@ -4,10 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Marks the constructor the annotation processor should use to deserialize a non-record class. JSON-key

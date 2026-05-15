@@ -4,10 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Declares a sealed interface or class polymorphic for JSON serialization. The discriminator property name

@@ -4,10 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Per-field configuration for a record component or class field of an {@link JSON @JSON}-annotated type.

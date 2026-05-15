@@ -4,8 +4,7 @@
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Stateless singleton {@link JSONObserver} that discards every callback. Used by generated code as the
