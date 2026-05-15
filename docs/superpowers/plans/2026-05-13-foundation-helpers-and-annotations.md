@@ -246,10 +246,7 @@ Each annotation is small enough to share a task. Build verifies after the group;
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Marks a record, class, or sealed interface for JSON serialization and deserialization. The annotation
@@ -277,10 +274,7 @@ public @interface JSON {
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Per-field configuration for a record component or class field of an {@link JSON @JSON}-annotated type.
@@ -313,10 +307,7 @@ public @interface JSONField {
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Declares a sealed interface or class polymorphic for JSON serialization. The discriminator property name
@@ -340,10 +331,7 @@ public @interface JSONTypeInfo {
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Sets the discriminator value for a subtype of an {@link JSONTypeInfo @JSONTypeInfo} hierarchy. Defaults
@@ -367,10 +355,7 @@ public @interface JSONSubtype {
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Marks the constructor the annotation processor should use to deserialize a non-record class. JSON-key
@@ -394,10 +379,7 @@ public @interface JSONConstructor {
  */
 package org.lattejava.json;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import module java.base;
 
 /**
  * Marks a {@code Map<String, Object>} field as the catch-all bucket for unknown JSON keys. Exactly one
@@ -531,8 +513,7 @@ git commit -m "test: verify annotation attribute defaults"
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Observer driven by {@link JSONParser} during deserialization of a JSON object. The annotation processor
@@ -595,8 +576,7 @@ Hold the commit until Task 6 step 2.
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Observer driven by {@link JSONParser} during deserialization of a JSON array. Element callbacks are
@@ -918,8 +898,7 @@ Expected: FAIL with "cannot find symbol: SkipObserver".
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Stateless singleton {@link JSONArrayObserver} that discards every callback. Used by generated code as
@@ -972,8 +951,7 @@ public final class SkipArrayObserver implements JSONArrayObserver<Object> {
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import module java.base;
 
 /**
  * Stateless singleton {@link JSONObserver} that discards every callback. Used by generated code as the
@@ -1182,10 +1160,7 @@ Expected: FAIL with "cannot find symbol: AnyObjectObserver".
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
+import module java.base;
 
 /**
  * {@link JSONArrayObserver} that accumulates every element into an {@link ArrayList} of the element's
@@ -1236,10 +1211,7 @@ public final class AnyArrayObserver implements JSONArrayObserver<List<Object>> {
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import module java.base;
 
 /**
  * {@link JSONObserver} that accumulates every key/value pair into a {@link LinkedHashMap} of the value's
@@ -1466,11 +1438,7 @@ Expected: FAIL with "cannot find symbol: JSONBuilder".
  */
 package org.lattejava.json;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
+import module java.base;
 
 /**
  * Fluent builder for JSON objects. Writes UTF-8 bytes directly to a {@link ByteArrayOutputStream};
@@ -1817,10 +1785,7 @@ Expected: FAIL with "cannot find symbol: JSONParser".
  */
 package org.lattejava.json;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
+import module java.base;
 
 /**
  * Observer-driven JSON parser. Walks a {@link String} cursor and emits typed callbacks on a target
