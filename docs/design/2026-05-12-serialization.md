@@ -55,6 +55,7 @@ The location is `<moduleName>.internal` — the consumer's module name plus an `
 
 For a module named `org.lattejava.project`, the helper code is placed in `org.lattejava.project.internal` and contains:
 
+- `JSONObjectHandler` — sealed marker permitting `JSONObserver` and `JSONPolymorphicObserver` (the two `beginObject` return kinds). MUST be copied alongside the two interfaces or consumer modules fail to compile.
 - `JSONObserver<T>`, `JSONArrayObserver<T>`, `JSONPolymorphicObserver<T>` — observer interfaces.
 - `JSONParser` — the parser.
 - `JSONBuilder` — the writer.
@@ -337,7 +338,7 @@ public final class UserJSON implements JSONObserver<User> {
     }
   }
 
-  @Override public JSONObserver<?> beginObject(String key) {
+  @Override public JSONObjectHandler beginObject(String key) {
     return switch (key) {
       case "address" -> new AddressJSON();
       default -> throw new JSONProcessingException("Unexpected object at key [" + key + "]");
@@ -642,7 +643,7 @@ public final class SkipObserver implements JSONObserver<Object> {
   @Override public void decimal(String key, BigDecimal value) {}
   @Override public void bool(String key, boolean value) {}
   @Override public void nullValue(String key) {}
-  @Override public JSONObserver<?> beginObject(String key) { return INSTANCE; }
+  @Override public JSONObjectHandler beginObject(String key) { return INSTANCE; }
   @Override public void object(String key, Object value) {}
   @Override public JSONArrayObserver<?> beginArray(String key) { return SkipArrayObserver.INSTANCE; }
   @Override public void array(String key, Object value) {}
