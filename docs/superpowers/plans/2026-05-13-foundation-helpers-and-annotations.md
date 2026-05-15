@@ -152,7 +152,7 @@ package org.lattejava.json;
  * Strategy for converting Java field names to JSON wire-form keys. Applied by the annotation processor at
  * compile time; not consulted at runtime.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public enum NamingStrategy {
   CAMEL_CASE,
@@ -198,7 +198,7 @@ package org.lattejava.json;
  * serialization failure. Messages wrap runtime values in {@code [brackets]} and include the JSON-path of
  * the failure when known.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public class JSONProcessingException extends RuntimeException {
   public JSONProcessingException(String message) {
@@ -255,7 +255,7 @@ import java.lang.annotation.Target;
  * Marks a record, class, or sealed interface for JSON serialization and deserialization. The annotation
  * processor generates a companion {@code *JSON} class for every type carrying this annotation.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
@@ -285,7 +285,7 @@ import java.lang.annotation.Target;
 /**
  * Per-field configuration for a record component or class field of an {@link JSON @JSON}-annotated type.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target({ElementType.FIELD, ElementType.RECORD_COMPONENT})
@@ -322,7 +322,7 @@ import java.lang.annotation.Target;
  * Declares a sealed interface or class polymorphic for JSON serialization. The discriminator property name
  * is required; OpenAPI semantics apply.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
@@ -349,7 +349,7 @@ import java.lang.annotation.Target;
  * Sets the discriminator value for a subtype of an {@link JSONTypeInfo @JSONTypeInfo} hierarchy. Defaults
  * to the simple class name when {@link #value()} is empty.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
@@ -377,7 +377,7 @@ import java.lang.annotation.Target;
  * mapping is taken from the constructor's parameter names. Not used on records; records have a canonical
  * constructor.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.CONSTRUCTOR)
@@ -403,7 +403,7 @@ import java.lang.annotation.Target;
  * Marks a {@code Map<String, Object>} field as the catch-all bucket for unknown JSON keys. Exactly one
  * catch-all is permitted per {@link JSON @JSON} type.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target({ElementType.FIELD, ElementType.RECORD_COMPONENT})
@@ -541,7 +541,7 @@ import java.math.BigInteger;
  * further only through explicit, throwing JDK calls (e.g. {@code Math.toIntExact}).
  *
  * @param <T> the constructed Java value type produced by {@link #finish()}
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public interface JSONObserver<T> {
   JSONArrayObserver<?> beginArray(String key);
@@ -604,7 +604,7 @@ import java.math.BigInteger;
  * consumed in a single pass.
  *
  * @param <T> the constructed Java value type produced by {@link #finish()}
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public interface JSONArrayObserver<T> {
   JSONArrayObserver<?> beginArray();
@@ -666,7 +666,7 @@ package org.lattejava.json;
  * rewinds, and parses normally into the concrete child observer returned by {@link #observerFor(String)}.
  *
  * @param <T> the sealed parent type
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public interface JSONPolymorphicObserver<T> {
   String discriminatorKey();
@@ -776,7 +776,7 @@ package org.lattejava.json;
  * methods. Each method throws {@link JSONProcessingException} when the source value is outside the target
  * type's range. Codegen calls these instead of inlining the range check at every narrowing site.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class Numbers {
   private Numbers() {
@@ -926,7 +926,7 @@ import java.math.BigInteger;
  * the {@code default} target of a parent's {@code beginArray} switch under {@link JSON @JSON}'s lenient
  * default policy: unknown JSON arrays are absorbed and discarded.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class SkipArrayObserver implements JSONArrayObserver<Object> {
   public static final SkipArrayObserver INSTANCE = new SkipArrayObserver();
@@ -980,7 +980,7 @@ import java.math.BigInteger;
  * {@code default} target of a parent's {@code beginObject} switch under {@link JSON @JSON}'s lenient
  * default policy: unknown JSON objects are absorbed and discarded.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class SkipObserver implements JSONObserver<Object> {
   public static final SkipObserver INSTANCE = new SkipObserver();
@@ -1193,7 +1193,7 @@ import java.util.List;
  * {@code Boolean}, {@code null}, {@code LinkedHashMap<String, Object>} for nested objects, nested
  * {@code ArrayList<Object>} for nested arrays). One instance per array; not thread-safe.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class AnyArrayObserver implements JSONArrayObserver<List<Object>> {
   private final List<Object> list = new ArrayList<>();
@@ -1246,7 +1246,7 @@ import java.util.Map;
  * natural Java shape (same mapping as {@link AnyArrayObserver}). Preserves JSON-object insertion order.
  * One instance per JSON object; not thread-safe.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class AnyObjectObserver implements JSONObserver<Map<String, Object>> {
   private final Map<String, Object> map = new LinkedHashMap<>();
@@ -1482,7 +1482,7 @@ import java.nio.charset.StandardCharsets;
  * {@link JSON @JSON}'s {@code omitNulls = true} default. Pass {@code false} to the constructor to emit
  * them faithfully.
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class JSONBuilder {
   private final boolean omitNulls;
@@ -1829,7 +1829,7 @@ import java.util.ArrayDeque;
  * booleans, and {@code null} at the top level are rejected (the library targets OpenAPI DTOs and JWT
  * payloads, both of which guarantee object envelopes).
  *
- * @author The Latte Project
+ * @author Brian Pontarelli
  */
 public final class JSONParser {
   private final int maxNestingDepth;
