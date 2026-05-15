@@ -10,17 +10,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a record, class, or sealed interface for JSON serialization and deserialization. The annotation
- * processor generates a companion {@code *JSON} class for every type carrying this annotation.
+ * Sets the discriminator value for a subtype of an {@link JSONTypeInfo @JSONTypeInfo} hierarchy. Defaults
+ * to the simple class name when {@link #value()} is empty.
  *
  * @author Brian Pontarelli
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
-public @interface JSON {
-  NamingStrategy naming() default NamingStrategy.IDENTITY;
-
-  boolean omitNulls() default true;
-
-  boolean strict() default false;
+public @interface JSONSubtype {
+  String value() default "";
 }
