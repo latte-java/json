@@ -68,6 +68,13 @@ public final class JSONParser {
     return target.finish();
   }
 
+  private <T> void dispatchArrayNumber(JSONArrayObserver<T> target) {
+    Number n = parseNumber();
+    if (n instanceof Long l) target.integer(l);
+    else if (n instanceof BigInteger bi) target.bigInteger(bi);
+    else target.decimal((BigDecimal) n);
+  }
+
   private <T> void dispatchNumber(JSONObserver<T> target, String key) {
     Number n = parseNumber();
     if (n instanceof Long l) target.integer(key, l);
@@ -95,6 +102,63 @@ public final class JSONParser {
       throw error("Expected [" + c + "] but found [" + src.charAt(pos) + "]");
     }
     pos++;
+  }
+
+  private <T> void parseArrayInto(JSONArrayObserver<T> target, int depth) {
+    if (depth > maxNestingDepth) {
+      throw error("Maximum nesting depth [" + maxNestingDepth + "] exceeded");
+    }
+    expect('[');
+    skipWhitespace();
+    if (pos < len && src.charAt(pos) == ']') {
+      pos++;
+      return;
+    }
+    int index = 0;
+    while (true) {
+      parseArrayValue(target, index, depth);
+      skipWhitespace();
+      if (pos >= len) throw error("Unterminated array");
+      char nc = src.charAt(pos);
+      if (nc == ',') { pos++; index++; continue; }
+      if (nc == ']') { pos++; return; }
+      throw error("Expected [,] or []] but found [" + nc + "]");
+    }
+  }
+
+  private <T> void parseArrayValue(JSONArrayObserver<T> target, int index, int depth) {
+    skipWhitespace();
+    if (pos >= len) throw error("Unexpected end of input");
+
+    path.push("[" + index + "]");
+    try {
+      char c = src.charAt(pos);
+      switch (c) {
+        case '"' -> target.string(parseString());
+        case 't' -> { parseLiteral("true"); target.bool(true); }
+        case 'f' -> { parseLiteral("false"); target.bool(false); }
+        case 'n' -> { parseLiteral("null"); target.nullValue(); }
+        case '-' -> dispatchArrayNumber(target);
+        case '{' -> {
+          @SuppressWarnings("unchecked")
+          JSONObserver<Object> child = (JSONObserver<Object>) target.beginObject();
+          parseObjectInto(child, depth + 1);
+          target.object(child.finish());
+        }
+        case '[' -> {
+          @SuppressWarnings("unchecked")
+          JSONArrayObserver<Object> child = (JSONArrayObserver<Object>) target.beginArray();
+          parseArrayInto(child, depth + 1);
+          target.array(child.finish());
+        }
+        default -> {
+          if (c >= '0' && c <= '9') dispatchArrayNumber(target);
+          else throw error("Unexpected character [" + c + "]");
+        }
+      }
+    } finally {
+      path.pop();
+    }
   }
 
   private int parseHex4() {
@@ -268,10 +332,21 @@ public final class JSONParser {
         case '-' -> dispatchNumber(target, key);
         default -> {
           if (c >= '0' && c <= '9') dispatchNumber(target, key);
-          else if (c == '{' || c == '[') {
-            // Containers handled in a later task — TASK 13 introduces nested object/array dispatch.
-            throw error("Container values not yet implemented in this task");
-          } else {
+          else if (c == '{') {
+            @SuppressWarnings("unchecked")
+            JSONObserver<Object> child = (JSONObserver<Object>) target.beginObject(key);
+            parseObjectInto(child, depth + 1);
+            Object value = child.finish();
+            target.object(key, value);
+          }
+          else if (c == '[') {
+            @SuppressWarnings("unchecked")
+            JSONArrayObserver<Object> child = (JSONArrayObserver<Object>) target.beginArray(key);
+            parseArrayInto(child, depth + 1);
+            Object value = child.finish();
+            target.array(key, value);
+          }
+          else {
             throw error("Unexpected character [" + c + "]");
           }
         }
@@ -285,7 +360,12 @@ public final class JSONParser {
     var sb = new StringBuilder("$");
     var it = path.descendingIterator();
     while (it.hasNext()) {
-      sb.append('.').append(it.next());
+      String segment = it.next();
+      if (segment.startsWith("[")) {
+        sb.append(segment);
+      } else {
+        sb.append('.').append(segment);
+      }
     }
     return sb.toString();
   }
