@@ -12,7 +12,7 @@ package org.lattejava.json;
  * @param <T> the sealed parent type
  * @author Brian Pontarelli
  */
-public interface JSONPolymorphicObserver<T> {
+public non-sealed interface JSONPolymorphicObserver<T> extends JSONObjectHandler {
   String discriminatorKey();
 
   JSONObserver<? extends T> observerFor(String discriminatorValue);

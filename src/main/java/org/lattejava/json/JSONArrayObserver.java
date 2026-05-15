@@ -17,7 +17,11 @@ import module java.base;
 public interface JSONArrayObserver<T> {
   JSONArrayObserver<?> beginArray();
 
-  Object beginObject();
+  /**
+   * Called for a nested JSON object array element. Returns either a {@link JSONObserver} for a concrete
+   * type or a {@link JSONPolymorphicObserver} for a sealed hierarchy. Must not return {@code null}.
+   */
+  JSONObjectHandler beginObject();
 
   void bigInteger(BigInteger value);
 

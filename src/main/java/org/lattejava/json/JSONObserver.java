@@ -15,10 +15,15 @@ import module java.base;
  * @param <T> the constructed Java value type produced by {@link #finish()}
  * @author Brian Pontarelli
  */
-public interface JSONObserver<T> {
+public non-sealed interface JSONObserver<T> extends JSONObjectHandler {
   JSONArrayObserver<?> beginArray(String key);
 
-  Object beginObject(String key);
+  /**
+   * Called for a nested JSON object value. Returns either a {@link JSONObserver} for a concrete type
+   * or a {@link JSONPolymorphicObserver} for a sealed hierarchy; the parser detects which and routes
+   * accordingly. Must not return {@code null}.
+   */
+  JSONObjectHandler beginObject(String key);
 
   void bigInteger(String key, BigInteger value);
 

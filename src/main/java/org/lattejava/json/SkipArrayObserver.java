@@ -25,7 +25,7 @@ public final class SkipArrayObserver implements JSONArrayObserver<Object> {
   }
 
   @Override
-  public Object beginObject() {
+  public JSONObjectHandler beginObject() {
     return SkipObserver.INSTANCE;
   }
 

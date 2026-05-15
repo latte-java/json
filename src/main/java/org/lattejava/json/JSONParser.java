@@ -189,15 +189,15 @@ public final class JSONParser {
         case 'n' -> { parseLiteral("null"); target.nullValue(); }
         case '-' -> dispatchArrayNumber(target);
         case '{' -> {
-          Object childRaw = target.beginObject();
-          if (childRaw instanceof JSONPolymorphicObserver<?> poly) {
-            Object childResult = parsePolymorphicObject(poly, depth + 1);
-            target.object(childResult);
-          } else {
-            @SuppressWarnings("unchecked")
-            JSONObserver<Object> child = (JSONObserver<Object>) childRaw;
-            parseObjectInto(child, depth + 1);
-            target.object(child.finish());
+          switch (target.beginObject()) {
+            case JSONPolymorphicObserver<?> poly ->
+                target.object(parsePolymorphicObject(poly, depth + 1));
+            case JSONObserver<?> obs -> {
+              @SuppressWarnings("unchecked")
+              JSONObserver<Object> child = (JSONObserver<Object>) obs;
+              parseObjectInto(child, depth + 1);
+              target.object(child.finish());
+            }
           }
         }
         case '[' -> {
@@ -441,15 +441,15 @@ public final class JSONParser {
         default -> {
           if (c >= '0' && c <= '9') dispatchNumber(target, key);
           else if (c == '{') {
-            Object childRaw = target.beginObject(key);
-            if (childRaw instanceof JSONPolymorphicObserver<?> poly) {
-              Object childResult = parsePolymorphicObject(poly, depth + 1);
-              target.object(key, childResult);
-            } else {
-              @SuppressWarnings("unchecked")
-              JSONObserver<Object> child = (JSONObserver<Object>) childRaw;
-              parseObjectInto(child, depth + 1);
-              target.object(key, child.finish());
+            switch (target.beginObject(key)) {
+              case JSONPolymorphicObserver<?> poly ->
+                  target.object(key, parsePolymorphicObject(poly, depth + 1));
+              case JSONObserver<?> obs -> {
+                @SuppressWarnings("unchecked")
+                JSONObserver<Object> child = (JSONObserver<Object>) obs;
+                parseObjectInto(child, depth + 1);
+                target.object(key, child.finish());
+              }
             }
           }
           else if (c == '[') {
@@ -501,7 +501,7 @@ public final class JSONParser {
       if (braceDepth == 1 && bracketDepth == 0 && c == '"') {
         int keyStart = p;
         String key = scanString(p);
-        p = keyStart + scanStringLength(keyStart);
+        p = keyEndOfString(keyStart);
         while (p < len && (src.charAt(p) == ' ' || src.charAt(p) == '\t'
                         || src.charAt(p) == '\n' || src.charAt(p) == '\r')) p++;
         if (p >= len || src.charAt(p) != ':') throw error("Scan-ahead expected [:] after key");
@@ -555,7 +555,12 @@ public final class JSONParser {
           case 't' -> sb.append('\t');
           case 'u' -> {
             if (q + 4 > len) throw error("Scan-ahead truncated \\u escape");
-            int code = Integer.parseInt(src, q, q + 4, 16);
+            int code;
+            try {
+              code = Integer.parseInt(src, q, q + 4, 16);
+            } catch (NumberFormatException e) {
+              throw error("Scan-ahead invalid \\u escape [\\u" + src.substring(q, q + 4) + "]", e);
+            }
             q += 4;
             sb.append((char) code);
           }
@@ -566,10 +571,6 @@ public final class JSONParser {
       }
     }
     throw error("Scan-ahead unterminated string");
-  }
-
-  private int scanStringLength(int p) {
-    return keyEndOfString(p) - p;
   }
 
   private int skipContainerAt(int p, char open, char close) {

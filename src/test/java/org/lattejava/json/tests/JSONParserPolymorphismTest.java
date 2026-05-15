@@ -32,7 +32,7 @@ public class JSONParserPolymorphismTest {
     RecordingChild(String typeName) { this.typeName = typeName; }
 
     @Override public JSONArrayObserver<?> beginArray(String key) { return new AnyArrayObserver(); }
-    @Override public Object beginObject(String key) { return new AnyObjectObserver(); }
+    @Override public JSONObjectHandler beginObject(String key) { return new AnyObjectObserver(); }
     @Override public void bigInteger(String key, BigInteger value) { data.put(key, value); }
     @Override public void bool(String key, boolean value) { data.put(key, value); }
     @Override public void decimal(String key, BigDecimal value) { data.put(key, value); }
@@ -48,7 +48,7 @@ public class JSONParserPolymorphismTest {
   static final class Parent implements JSONObserver<Map<String, Object>> {
     final Map<String, Object> data = new LinkedHashMap<>();
     @Override public JSONArrayObserver<?> beginArray(String key) { throw new AssertionError(); }
-    @Override public Object beginObject(String key) {
+    @Override public JSONObjectHandler beginObject(String key) {
       return "pet".equals(key) ? new PetPoly() : SkipObserver.INSTANCE;
     }
     @Override public void bigInteger(String key, BigInteger value) {}
