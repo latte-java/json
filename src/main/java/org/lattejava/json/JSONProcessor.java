@@ -25,16 +25,16 @@ public class JSONProcessor {
   private final int maxObjectMembers;
 
   /**
-   * Constructs a {@code JSONProcessor} with defaults (maxNestingDepth=16, maxNumberLength=1000,
-   * maxObjectMembers=1000, maxArrayElements=10000, allowDuplicateJSONKeys=false).
+   * Constructs a {@code JSONProcessor} with defaults (maxNestingDepth=16, maxNumberLength=1000, maxObjectMembers=1000,
+   * maxArrayElements=10000, allowDuplicateJSONKeys=false).
    */
   public JSONProcessor() {
     this(16, 1000, DEFAULT_MAX_OBJECT_MEMBERS, DEFAULT_MAX_ARRAY_ELEMENTS, false);
   }
 
   /**
-   * Constructs a {@code JSONProcessor} with explicit depth, number, and duplicate-key defenses; object/array
-   * fan-out caps default to {@value #DEFAULT_MAX_OBJECT_MEMBERS} and {@value #DEFAULT_MAX_ARRAY_ELEMENTS}.
+   * Constructs a {@code JSONProcessor} with explicit depth, number, and duplicate-key defenses; object/array fan-out
+   * caps default to {@value #DEFAULT_MAX_OBJECT_MEMBERS} and {@value #DEFAULT_MAX_ARRAY_ELEMENTS}.
    *
    * @param maxNestingDepth        maximum JSON object/array nesting depth (must be &gt; 0)
    * @param maxNumberLength        maximum digit-run length of a single JSON number (integer + decimal + exponent
@@ -60,7 +60,7 @@ public class JSONProcessor {
    *                               {@link JSONProcessingException}.
    */
   public JSONProcessor(int maxNestingDepth, int maxNumberLength, int maxObjectMembers,
-                            int maxArrayElements, boolean allowDuplicateJSONKeys) {
+                       int maxArrayElements, boolean allowDuplicateJSONKeys) {
     if (maxNestingDepth <= 0) {
       throw new IllegalArgumentException("maxNestingDepth must be > 0 but found [" + maxNestingDepth + "]");
     }
