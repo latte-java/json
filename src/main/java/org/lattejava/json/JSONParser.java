@@ -16,10 +16,9 @@ import module java.base;
  * @author Brian Pontarelli
  */
 public final class JSONParser {
-  private final int maxNestingDepth;
-
-  private final ArrayDeque<String> path = new ArrayDeque<>();
   private int len;
+  private final int maxNestingDepth;
+  private final ArrayDeque<String> path = new ArrayDeque<>();
   private int pos;
   private String src;
 
@@ -69,10 +68,23 @@ public final class JSONParser {
     return target.finish();
   }
 
+  private <T> void dispatchNumber(JSONObserver<T> target, String key) {
+    Number n = parseNumber();
+    if (n instanceof Long l) target.integer(key, l);
+    else if (n instanceof BigInteger bi) target.bigInteger(key, bi);
+    else target.decimal(key, (BigDecimal) n);
+  }
+
   private JSONProcessingException error(String message) {
     String p = path.isEmpty() ? "$" : pathString();
     return new JSONProcessingException(
         message + " at path [" + p + "] position [" + pos + "]");
+  }
+
+  private JSONProcessingException error(String message, Throwable cause) {
+    String p = path.isEmpty() ? "$" : pathString();
+    return new JSONProcessingException(
+        message + " at path [" + p + "] position [" + pos + "]", cause);
   }
 
   private void expect(char c) {
@@ -105,7 +117,7 @@ public final class JSONParser {
   private void parseLiteral(String literal) {
     if (pos + literal.length() > len
         || !src.regionMatches(pos, literal, 0, literal.length())) {
-      throw error("Invalid literal at position [" + pos + "]");
+      throw error("Invalid literal");
     }
     pos += literal.length();
   }
@@ -121,8 +133,12 @@ public final class JSONParser {
       if (pos >= len) throw error("Number ends after [-]");
     }
     char c = src.charAt(pos);
-    if (c == '0') { pos++; digitCount++; }
-    else if (c >= '1' && c <= '9') {
+    if (c == '0') {
+      pos++; digitCount++;
+      if (pos < len && src.charAt(pos) >= '0' && src.charAt(pos) <= '9') {
+        throw error("Leading zeros are not allowed in numbers");
+      }
+    } else if (c >= '1' && c <= '9') {
       while (pos < len && src.charAt(pos) >= '0' && src.charAt(pos) <= '9') {
         pos++; digitCount++;
       }
@@ -158,9 +174,7 @@ public final class JSONParser {
       }
       return new BigInteger(src.substring(start, pos));
     } catch (NumberFormatException e) {
-      throw new JSONProcessingException(
-          "Invalid number [" + src.substring(start, pos) + "] at path ["
-              + (path.isEmpty() ? "$" : pathString()) + "]", e);
+      throw error("Invalid number [" + src.substring(start, pos) + "]", e);
     }
   }
 
@@ -265,13 +279,6 @@ public final class JSONParser {
     } finally {
       path.pop();
     }
-  }
-
-  private <T> void dispatchNumber(JSONObserver<T> target, String key) {
-    Number n = parseNumber();
-    if (n instanceof Long l) target.integer(key, l);
-    else if (n instanceof BigInteger bi) target.bigInteger(key, bi);
-    else target.decimal(key, (BigDecimal) n);
   }
 
   private String pathString() {
