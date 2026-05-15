@@ -207,11 +207,14 @@ public interface JSONObserver<T> {
   void bool(String key, boolean value);
   void nullValue(String key);
 
-  // Nested object: parent returns the child observer to use. Parser drives the
-  // child to completion, calls child.finish(), then delivers the result to the
-  // parent via object(...). Recursion lives in the parser; each observer only
-  // handles its own one level of structure.
-  JSONObserver<?> beginObject(String key);
+  // Nested object: parent returns the child handler to use — either a
+  // JSONObserver (concrete nested type) or a JSONPolymorphicObserver (sealed
+  // hierarchy). Both implement the sealed JSONObjectHandler marker so the
+  // parser dispatches with a compiler-verified exhaustive switch. Parser drives
+  // the child to completion, calls child.finish(), then delivers the result to
+  // the parent via object(...). Recursion lives in the parser; each observer
+  // only handles its own one level of structure.
+  JSONObjectHandler beginObject(String key);
   void object(String key, Object value);
 
   // Nested array: parent returns a JSONArrayObserver. Parser drives it to
@@ -223,6 +226,18 @@ public interface JSONObserver<T> {
   T finish();
 }
 ```
+
+### The `JSONObjectHandler` marker
+
+`beginObject` must be able to return *either* a `JSONObserver` (concrete nested type) or a `JSONPolymorphicObserver` (sealed hierarchy). Those two interfaces are otherwise unrelated, so they share a sealed marker supertype:
+
+```java
+public sealed interface JSONObjectHandler
+    permits JSONObserver, JSONPolymorphicObserver {
+}
+```
+
+`JSONObserver` and `JSONPolymorphicObserver` are declared `non-sealed` (open for the generated/handwritten implementations) and `extends JSONObjectHandler`. The parser dispatches on the runtime kind with an exhaustive pattern `switch` — no `default` arm, exhaustiveness checked by the compiler. `JSONArrayObserver` is *not* part of the marker (arrays have no element-vs-object ambiguity at the array level; element-level objects still go through `beginObject` → `JSONObjectHandler`).
 
 ### The `JSONArrayObserver` interface
 
@@ -237,7 +252,7 @@ public interface JSONArrayObserver<T> {
   void bool(boolean value);
   void nullValue();
 
-  JSONObserver<?> beginObject();           // element is a JSON object
+  JSONObjectHandler beginObject();         // element is a JSON object (concrete or polymorphic)
   void object(Object value);
 
   JSONArrayObserver<?> beginArray();       // element is itself an array
@@ -942,7 +957,7 @@ Decisions that still need to be made before this design is implementable. Ordere
 ### 1. Observer interface shape
 
 - [x] **Callback granularity.** Per-JSON-type, with numbers split into three typed methods: `integer(String key, long value)`, `bigInteger(String key, BigInteger value)`, `decimal(String key, BigDecimal value)`. Strings, booleans, and null each get their own callback. Parser routes to each based on the bucket it already classifies during digit-walk. Avoids boxing on the common `long` fast path and gives the codegen statically typed values at every call site — no `instanceof` branching, easy precision-safe narrowing via `Math.toIntExact` / `BigInteger.intValueExact` / `BigDecimal.intValueExact`.
-- [x] **Nested object dispatch.** Parent observer returns a child observer from `JSONObserver<?> beginObject(String key)`. Parser drives the child to completion, calls `child.finish()`, then delivers the resulting value to the parent via `void object(String key, Object value)`. Recursion lives in the parser; each observer only handles one level of structure. Codegen for the parent is a key-switch returning the right `*JSON` instance; for the child, the cast in `object(...)` is type-safe because codegen knows the expected target type.
+- [x] **Nested object dispatch.** Parent observer returns a child handler from `JSONObjectHandler beginObject(String key)` — either a `JSONObserver` or a `JSONPolymorphicObserver` (both `non-sealed extends` the sealed `JSONObjectHandler` marker, enabling a compiler-exhaustive dispatch `switch` in the parser). Parser drives the child to completion, calls `child.finish()`, then delivers the resulting value to the parent via `void object(String key, Object value)`. Recursion lives in the parser; each observer only handles one level of structure. Codegen for the parent is a key-switch returning the right `*JSON` instance; for the child, the cast in `object(...)` is type-safe because codegen knows the expected target type.
 - [x] **Array handling.** Separate `JSONArrayObserver<T>` interface returned from `JSONObserver.beginArray(String key)`. Parser drives the array observer to completion, calls `finish()`, then delivers the result back via `JSONObserver.array(String key, Object value)`. Element-is-`@JSON` cases dispatch via the array observer's own `beginObject()` / `object(value)`, mirroring the object protocol one level down. Codegen emits a small inner `JSONArrayObserver` per `List<E>` field. Element callbacks are positional (no key, no index).
 - [x] **Where JSON→Java coercion happens.** Three-layer pipeline. The parser only classifies into JSON-side buckets (`String`, `long`-fits, `BigInteger`, `BigDecimal`, `boolean`, `null`, object, array) and has no knowledge of target Java types. The `JSONObserver` interface is shaped by those buckets, not by field types. The generated `*JSON` class performs the final narrowing in each switch arm using JDK methods that throw on data loss (`Math.toIntExact`, `BigDecimal.intValueExact`, `UUID.fromString`, `Instant.parse`, `Enum.valueOf`, etc.). No `instanceof` chains, no reflection. Silent precision loss occurs only on intrinsically lossy target-type choices (e.g. `float`/`double` field receiving a `BigDecimal`); users who need exact precision declare the field as `BigDecimal` instead.
 
