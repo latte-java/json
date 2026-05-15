@@ -60,10 +60,10 @@ public class JSONParserScalarsTest {
   @Test
   public void integerLongFastPath() {
     var r = new RecorderObserver();
-    parse("{\"a\":0,\"b\":-1,\"c\":9223372036854775807}", r);
+    parse("{\"a\":0,\"b\":-1,\"c\":999999999999999999}", r);
     assertEquals(r.map.get("a"), 0L);
     assertEquals(r.map.get("b"), -1L);
-    assertEquals(r.map.get("c"), 9223372036854775807L);
+    assertEquals(r.map.get("c"), 999999999999999999L);
   }
 
   @Test

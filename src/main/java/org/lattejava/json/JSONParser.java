@@ -156,11 +156,7 @@ public final class JSONParser {
       if (digitCount <= 18) {
         return Long.parseLong(src, start, pos, 10);
       }
-      try {
-        return Long.parseLong(src, start, pos, 10);
-      } catch (NumberFormatException ignored) {
-        return new BigInteger(src.substring(start, pos));
-      }
+      return new BigInteger(src.substring(start, pos));
     } catch (NumberFormatException e) {
       throw new JSONProcessingException(
           "Invalid number [" + src.substring(start, pos) + "] at path ["
