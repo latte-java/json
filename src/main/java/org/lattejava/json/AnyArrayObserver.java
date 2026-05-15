@@ -23,7 +23,7 @@ public final class AnyArrayObserver implements JSONArrayObserver<List<Object>> {
   }
 
   @Override
-  public JSONObserver<?> beginObject() {
+  public Object beginObject() {
     return new AnyObjectObserver();
   }
 

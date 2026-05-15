@@ -22,7 +22,7 @@ public final class AnyObjectObserver implements JSONObserver<Map<String, Object>
   }
 
   @Override
-  public JSONObserver<?> beginObject(String key) {
+  public Object beginObject(String key) {
     return new AnyObjectObserver();
   }
 

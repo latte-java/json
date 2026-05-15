@@ -18,7 +18,7 @@ import module java.base;
 public interface JSONObserver<T> {
   JSONArrayObserver<?> beginArray(String key);
 
-  JSONObserver<?> beginObject(String key);
+  Object beginObject(String key);
 
   void bigInteger(String key, BigInteger value);
 

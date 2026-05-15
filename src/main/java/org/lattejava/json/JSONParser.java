@@ -68,6 +68,41 @@ public final class JSONParser {
     return target.finish();
   }
 
+  public <T> T parsePolymorphic(byte[] bytes, JSONPolymorphicObserver<T> target) {
+    if (bytes == null) {
+      throw new JSONProcessingException("Input bytes are null");
+    }
+    return parsePolymorphic(new String(bytes, StandardCharsets.UTF_8), target);
+  }
+
+  public <T> T parsePolymorphic(String json, JSONPolymorphicObserver<T> target) {
+    if (json == null) {
+      throw new JSONProcessingException("Input string is null");
+    }
+    if (target == null) {
+      throw new JSONProcessingException("Observer is null");
+    }
+    this.src = json;
+    this.len = json.length();
+    this.pos = 0;
+    this.path.clear();
+
+    skipWhitespace();
+    if (pos >= len) {
+      throw error("Empty input");
+    }
+    if (peek() != '{') {
+      throw error("Expected top-level JSON object but found [" + peek() + "]");
+    }
+    @SuppressWarnings("unchecked")
+    T result = (T) parsePolymorphicObject(target, 0);
+    skipWhitespace();
+    if (pos != len) {
+      throw error("Trailing content after JSON value");
+    }
+    return result;
+  }
+
   private <T> void dispatchArrayNumber(JSONArrayObserver<T> target) {
     Number n = parseNumber();
     if (n instanceof Long l) target.integer(l);
@@ -102,6 +137,20 @@ public final class JSONParser {
       throw error("Expected [" + c + "] but found [" + src.charAt(pos) + "]");
     }
     pos++;
+  }
+
+  private int keyEndOfString(int p) {
+    if (src.charAt(p) != '"') throw error("Scan expected [\"]");
+    int q = p + 1;
+    while (q < len) {
+      char c = src.charAt(q++);
+      if (c == '"') return q;
+      if (c == '\\') {
+        if (q >= len) throw error("Unterminated escape in scan-ahead");
+        q++;
+      }
+    }
+    throw error("Unterminated string in scan-ahead");
   }
 
   private <T> void parseArrayInto(JSONArrayObserver<T> target, int depth) {
@@ -140,10 +189,16 @@ public final class JSONParser {
         case 'n' -> { parseLiteral("null"); target.nullValue(); }
         case '-' -> dispatchArrayNumber(target);
         case '{' -> {
-          @SuppressWarnings("unchecked")
-          JSONObserver<Object> child = (JSONObserver<Object>) target.beginObject();
-          parseObjectInto(child, depth + 1);
-          target.object(child.finish());
+          Object childRaw = target.beginObject();
+          if (childRaw instanceof JSONPolymorphicObserver<?> poly) {
+            Object childResult = parsePolymorphicObject(poly, depth + 1);
+            target.object(childResult);
+          } else {
+            @SuppressWarnings("unchecked")
+            JSONObserver<Object> child = (JSONObserver<Object>) childRaw;
+            parseObjectInto(child, depth + 1);
+            target.object(child.finish());
+          }
         }
         case '[' -> {
           @SuppressWarnings("unchecked")
@@ -270,6 +325,59 @@ public final class JSONParser {
     }
   }
 
+  private <T> void parseObjectIntoSkippingKey(JSONObserver<T> target, String skip, int depth) {
+    if (depth > maxNestingDepth) {
+      throw error("Maximum nesting depth [" + maxNestingDepth + "] exceeded");
+    }
+    expect('{');
+    skipWhitespace();
+    if (pos < len && src.charAt(pos) == '}') {
+      pos++;
+      return;
+    }
+    while (true) {
+      skipWhitespace();
+      if (pos >= len || src.charAt(pos) != '"') throw error("Expected string key");
+      String key = parseString();
+      skipWhitespace();
+      expect(':');
+      if (key.equals(skip)) {
+        skipWhitespace();
+        pos = skipValueAt(pos);
+      } else {
+        parseValue(target, key, depth);
+      }
+      skipWhitespace();
+      if (pos >= len) throw error("Unterminated object");
+      char nc = src.charAt(pos);
+      if (nc == ',') { pos++; continue; }
+      if (nc == '}') { pos++; return; }
+      throw error("Expected [,] or [}] but found [" + nc + "]");
+    }
+  }
+
+  private Object parsePolymorphicObject(JSONPolymorphicObserver<?> poly, int depth) {
+    if (depth > maxNestingDepth) {
+      throw error("Maximum nesting depth [" + maxNestingDepth + "] exceeded");
+    }
+    if (src.charAt(pos) != '{') {
+      throw error("Expected [{] for polymorphic object");
+    }
+    int saved = pos;
+    String discriminatorKey = poly.discriminatorKey();
+    String discriminatorValue = scanForDiscriminator(discriminatorKey);
+    if (discriminatorValue == null) {
+      throw error("Discriminator key [" + discriminatorKey + "] missing");
+    }
+    pos = saved;
+
+    @SuppressWarnings("unchecked")
+    JSONObserver<Object> child = (JSONObserver<Object>) poly.observerFor(discriminatorValue);
+
+    parseObjectIntoSkippingKey(child, discriminatorKey, depth);
+    return child.finish();
+  }
+
   private String parseString() {
     expect('"');
     StringBuilder sb = new StringBuilder();
@@ -333,11 +441,16 @@ public final class JSONParser {
         default -> {
           if (c >= '0' && c <= '9') dispatchNumber(target, key);
           else if (c == '{') {
-            @SuppressWarnings("unchecked")
-            JSONObserver<Object> child = (JSONObserver<Object>) target.beginObject(key);
-            parseObjectInto(child, depth + 1);
-            Object value = child.finish();
-            target.object(key, value);
+            Object childRaw = target.beginObject(key);
+            if (childRaw instanceof JSONPolymorphicObserver<?> poly) {
+              Object childResult = parsePolymorphicObject(poly, depth + 1);
+              target.object(key, childResult);
+            } else {
+              @SuppressWarnings("unchecked")
+              JSONObserver<Object> child = (JSONObserver<Object>) childRaw;
+              parseObjectInto(child, depth + 1);
+              target.object(key, child.finish());
+            }
           }
           else if (c == '[') {
             @SuppressWarnings("unchecked")
@@ -372,6 +485,132 @@ public final class JSONParser {
 
   private char peek() {
     return src.charAt(pos);
+  }
+
+  private String scanForDiscriminator(String discriminatorKey) {
+    int p = pos;
+    if (src.charAt(p) != '{') throw error("Scan-ahead expected [{]");
+    p++;
+    int braceDepth = 1;
+    int bracketDepth = 0;
+
+    while (p < len && braceDepth > 0) {
+      char c = src.charAt(p);
+      if (c == ' ' || c == '\t' || c == '\n' || c == '\r') { p++; continue; }
+
+      if (braceDepth == 1 && bracketDepth == 0 && c == '"') {
+        int keyStart = p;
+        String key = scanString(p);
+        p = keyStart + scanStringLength(keyStart);
+        while (p < len && (src.charAt(p) == ' ' || src.charAt(p) == '\t'
+                        || src.charAt(p) == '\n' || src.charAt(p) == '\r')) p++;
+        if (p >= len || src.charAt(p) != ':') throw error("Scan-ahead expected [:] after key");
+        p++;
+        while (p < len && (src.charAt(p) == ' ' || src.charAt(p) == '\t'
+                        || src.charAt(p) == '\n' || src.charAt(p) == '\r')) p++;
+        if (key.equals(discriminatorKey)) {
+          if (p >= len || src.charAt(p) != '"') {
+            throw error("Discriminator value for [" + discriminatorKey + "] must be a string");
+          }
+          return scanString(p);
+        }
+        p = skipValueAt(p);
+        while (p < len && (src.charAt(p) == ' ' || src.charAt(p) == '\t'
+                        || src.charAt(p) == '\n' || src.charAt(p) == '\r')) p++;
+        if (p < len && src.charAt(p) == ',') p++;
+        continue;
+      }
+
+      if (c == '{')      braceDepth++;
+      else if (c == '}') braceDepth--;
+      else if (c == '[') bracketDepth++;
+      else if (c == ']') bracketDepth--;
+      else if (c == '"') {
+        p = keyEndOfString(p);
+        continue;
+      }
+      p++;
+    }
+    return null;
+  }
+
+  private String scanString(int p) {
+    if (src.charAt(p) != '"') throw error("Scan expected [\"]");
+    int q = p + 1;
+    StringBuilder sb = new StringBuilder();
+    while (q < len) {
+      char c = src.charAt(q++);
+      if (c == '"') return sb.toString();
+      if (c == '\\') {
+        if (q >= len) throw error("Scan-ahead unterminated escape");
+        char esc = src.charAt(q++);
+        switch (esc) {
+          case '"' -> sb.append('"');
+          case '\\' -> sb.append('\\');
+          case '/' -> sb.append('/');
+          case 'b' -> sb.append('\b');
+          case 'f' -> sb.append('\f');
+          case 'n' -> sb.append('\n');
+          case 'r' -> sb.append('\r');
+          case 't' -> sb.append('\t');
+          case 'u' -> {
+            if (q + 4 > len) throw error("Scan-ahead truncated \\u escape");
+            int code = Integer.parseInt(src, q, q + 4, 16);
+            q += 4;
+            sb.append((char) code);
+          }
+          default -> throw error("Scan-ahead invalid escape [\\" + esc + "]");
+        }
+      } else {
+        sb.append(c);
+      }
+    }
+    throw error("Scan-ahead unterminated string");
+  }
+
+  private int scanStringLength(int p) {
+    return keyEndOfString(p) - p;
+  }
+
+  private int skipContainerAt(int p, char open, char close) {
+    int depth = 0;
+    while (p < len) {
+      char c = src.charAt(p);
+      if (c == '"') { p = keyEndOfString(p); continue; }
+      if (c == open) depth++;
+      else if (c == close) {
+        depth--;
+        if (depth == 0) return p + 1;
+      }
+      p++;
+    }
+    throw error("Unterminated container in scan-ahead");
+  }
+
+  private int skipNumberAt(int p) {
+    if (src.charAt(p) == '-') p++;
+    while (p < len) {
+      char c = src.charAt(p);
+      if ((c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') p++;
+      else break;
+    }
+    return p;
+  }
+
+  private int skipValueAt(int p) {
+    while (p < len && (src.charAt(p) == ' ' || src.charAt(p) == '\t'
+                    || src.charAt(p) == '\n' || src.charAt(p) == '\r')) p++;
+    if (p >= len) throw error("Unexpected end during scan-ahead");
+    char c = src.charAt(p);
+    return switch (c) {
+      case '"' -> keyEndOfString(p);
+      case '{' -> skipContainerAt(p, '{', '}');
+      case '[' -> skipContainerAt(p, '[', ']');
+      case 't' -> p + 4;
+      case 'f' -> p + 5;
+      case 'n' -> p + 4;
+      default -> skipNumberAt(p);
+    };
   }
 
   private void skipWhitespace() {
