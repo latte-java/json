@@ -13,6 +13,9 @@ import module java.base;
  * booleans, and {@code null} at the top level are rejected (the library targets OpenAPI DTOs and JWT
  * payloads, both of which guarantee object envelopes).
  *
+ * <p>Instances are not thread-safe — they carry per-parse cursor state. Create a new
+ * {@code JSONParser} per parse call (generated companion code does exactly this).
+ *
  * @author Brian Pontarelli
  */
 public final class JSONParser {

@@ -67,7 +67,7 @@ public class JSONParserScalarsTest {
   }
 
   @Test
-  public void integerOverNineteenDigitsBecomesBigInteger() {
+  public void integerOverEighteenDigitsBecomesBigInteger() {
     var r = new RecorderObserver();
     parse("{\"big\":99999999999999999999}", r);
     assertEquals(r.map.get("big"), new BigInteger("99999999999999999999"));

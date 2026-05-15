@@ -23,9 +23,9 @@ import module java.base;
  * @author Brian Pontarelli
  */
 public final class JSONBuilder {
+  private boolean first = true;
   private final boolean omitNulls;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream(256);
-  private boolean first = true;
 
   public JSONBuilder() {
     this(true);
