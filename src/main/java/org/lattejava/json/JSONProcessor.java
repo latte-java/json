@@ -10,10 +10,13 @@ import module java.compiler;
 import javax.lang.model.type.TypeKind;
 
 /**
- * Annotation processor for {@link JSON @JSON}. Plan 2 scope: records whose components are primitives,
- * boxed primitives, or {@code String}. Emits the runtime helper set into the consumer's
- * {@code <module>.internal} package and a per-record observer companion into
- * {@code <typePackage>.internal}.
+ * Annotation processor for {@link JSON @JSON}. Generates a serialization/deserialization companion
+ * for each annotated record. Supported component types: primitives and their boxed forms,
+ * {@code String}, {@code BigInteger}, {@code BigDecimal}, any {@code enum}, {@code UUID}, and the
+ * ISO-8601 {@code java.time} types ({@code Instant}, {@code LocalDate}, {@code LocalDateTime},
+ * {@code OffsetDateTime}, {@code ZonedDateTime}, {@code Duration}, {@code Period}). Emits the runtime
+ * helper set into the consumer's {@code <module>.internal} package and a per-record observer
+ * companion into {@code <typePackage>.internal}.
  *
  * @author Brian Pontarelli
  */
@@ -112,12 +115,12 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("package ").append(companionPkg).append(";\n\n");
     sb.append("import module java.base;\n");
     sb.append("import ").append(qualifiedType).append(";\n");
-    sb.append("import ").append(internalPkg).append(".JSONBuilder;\n");
-    sb.append("import ").append(internalPkg).append(".JSONObserver;\n");
-    sb.append("import ").append(internalPkg).append(".JSONArrayObserver;\n");
-    sb.append("import ").append(internalPkg).append(".JSONObjectHandler;\n");
-    sb.append("import ").append(internalPkg).append(".JSONParser;\n");
     sb.append("import ").append(internalPkg).append(".Conversions;\n");
+    sb.append("import ").append(internalPkg).append(".JSONArrayObserver;\n");
+    sb.append("import ").append(internalPkg).append(".JSONBuilder;\n");
+    sb.append("import ").append(internalPkg).append(".JSONObjectHandler;\n");
+    sb.append("import ").append(internalPkg).append(".JSONObserver;\n");
+    sb.append("import ").append(internalPkg).append(".JSONParser;\n");
     sb.append("import ").append(internalPkg).append(".JSONProcessingException;\n");
     sb.append("import ").append(internalPkg).append(".Numbers;\n");
     comps.stream()
@@ -463,7 +466,8 @@ public final class JSONProcessor extends AbstractProcessor {
     for (RecordComponentElement c : record.getRecordComponents()) {
       if (!isSupportedComponentType(c.asType())) {
         error(c, "@JSON component [" + c.getSimpleName() + "] has unsupported type ["
-            + c.asType() + "] in this release (only primitives, boxed primitives, and String)");
+            + c.asType() + "] (supported: primitives, boxed primitives, String, "
+            + "BigInteger, BigDecimal, enums, UUID, and java.time types)");
         ok = false;
       }
     }
