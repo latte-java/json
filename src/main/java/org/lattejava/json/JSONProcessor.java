@@ -167,25 +167,121 @@ public final class JSONProcessor extends AbstractProcessor {
     }
   }
 
+  private void appendDefaultArm(StringBuilder sb, boolean strict) {
+    if (strict) {
+      sb.append("      default -> throw new IllegalStateException(\"Unknown JSON key [\" + key + \"]\");\n");
+    } else {
+      sb.append("      default -> { /* lenient: ignore unknown key */ }\n");
+    }
+  }
+
   private void appendObserverMethods(StringBuilder sb, TypeElement record,
                                      List<RecordComponentElement> comps) {
-    // Task 5 replaces these bodies with real accumulation/dispatch. For now they must compile.
-    sb.append("  @Override public void string(String key, String value) {}\n");
-    sb.append("  @Override public void integer(String key, long value) {}\n");
-    sb.append("  @Override public void bigInteger(String key, BigInteger value) {}\n");
-    sb.append("  @Override public void decimal(String key, BigDecimal value) {}\n");
-    sb.append("  @Override public void bool(String key, boolean value) {}\n");
-    sb.append("  @Override public void nullValue(String key) {}\n");
+    boolean strict = readStrict(record);
+    String simpleName = record.getSimpleName().toString();
+
+    sb.append("  @Override public void string(String key, String value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      if (c.asType().toString().equals("java.lang.String")) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = value;\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
+    sb.append("  @Override public void integer(String key, long value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String t = c.asType().toString();
+      String narrow = integerNarrowing(t);
+      if (narrow != null) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
+    sb.append("  @Override public void bigInteger(String key, java.math.BigInteger value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String t = c.asType().toString();
+      String narrow = bigIntegerNarrowing(t);
+      if (narrow != null) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
+    sb.append("  @Override public void decimal(String key, java.math.BigDecimal value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String t = c.asType().toString();
+      String narrow = decimalNarrowing(t);
+      if (narrow != null) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
+    sb.append("  @Override public void bool(String key, boolean value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String t = c.asType().toString();
+      if (t.equals("boolean") || t.equals("java.lang.Boolean")) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = value;\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
+    sb.append("  @Override public void nullValue(String key) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      if (c.asType().getKind().isPrimitive()) {
+        sb.append("      case \"").append(c.getSimpleName())
+          .append("\" -> throw new IllegalStateException(")
+          .append("\"null for primitive field [").append(c.getSimpleName()).append("]\");\n");
+      }
+    }
+    appendDefaultArm(sb, strict);
+    sb.append("    }\n  }\n");
+
     sb.append("  @Override public JSONObjectHandler beginObject(String key) {\n");
-    sb.append("    throw new IllegalStateException(\"no nested object in this release\");\n");
+    sb.append("    throw new IllegalStateException(\"nested objects unsupported in this release\");\n");
     sb.append("  }\n");
     sb.append("  @Override public void object(String key, Object value) {}\n");
     sb.append("  @Override public JSONArrayObserver<?> beginArray(String key) {\n");
-    sb.append("    throw new IllegalStateException(\"no array in this release\");\n");
+    sb.append("    throw new IllegalStateException(\"arrays unsupported in this release\");\n");
     sb.append("  }\n");
     sb.append("  @Override public void array(String key, Object value) {}\n");
-    sb.append("  @Override public ").append(record.getSimpleName())
-      .append(" finish() { return null; }\n");
+
+    sb.append("  @Override public ").append(simpleName).append(" finish() {\n");
+    sb.append("    return new ").append(simpleName).append("(");
+    for (int i = 0; i < comps.size(); i++) {
+      if (i > 0) sb.append(", ");
+      sb.append("this.").append(comps.get(i).getSimpleName());
+    }
+    sb.append(");\n  }\n");
+  }
+
+  private String bigIntegerNarrowing(String type) {
+    return switch (type) {
+      case "long", "java.lang.Long" -> "value.longValueExact()";
+      case "int", "java.lang.Integer" -> "value.intValueExact()";
+      case "short", "java.lang.Short" -> "Numbers.toShortExact(value.longValueExact())";
+      case "byte", "java.lang.Byte" -> "Numbers.toByteExact(value.longValueExact())";
+      case "float", "java.lang.Float" -> "value.floatValue()";
+      case "double", "java.lang.Double" -> "value.doubleValue()";
+      default -> null;
+    };
   }
 
   private String builderCall(RecordComponentElement c, String accessor) {
@@ -205,8 +301,32 @@ public final class JSONProcessor extends AbstractProcessor {
     };
   }
 
+  private String decimalNarrowing(String type) {
+    return switch (type) {
+      case "float", "java.lang.Float" -> "value.floatValue()";
+      case "double", "java.lang.Double" -> "value.doubleValue()";
+      case "int", "java.lang.Integer" -> "value.intValueExact()";
+      case "long", "java.lang.Long" -> "value.longValueExact()";
+      case "short", "java.lang.Short" -> "Numbers.toShortExact(value.longValueExact())";
+      case "byte", "java.lang.Byte" -> "Numbers.toByteExact(value.longValueExact())";
+      default -> null;
+    };
+  }
+
   private void error(Element e, String message) {
     processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, e);
+  }
+
+  private String integerNarrowing(String type) {
+    return switch (type) {
+      case "long", "java.lang.Long" -> "value";
+      case "int", "java.lang.Integer" -> "Math.toIntExact(value)";
+      case "short", "java.lang.Short" -> "Numbers.toShortExact(value)";
+      case "byte", "java.lang.Byte" -> "Numbers.toByteExact(value)";
+      case "float", "java.lang.Float" -> "(float) value";
+      case "double", "java.lang.Double" -> "(double) value";
+      default -> null;
+    };
   }
 
   private boolean isSupportedComponentType(TypeMirror t) {
