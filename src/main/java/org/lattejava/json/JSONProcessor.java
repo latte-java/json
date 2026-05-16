@@ -24,9 +24,9 @@ import javax.lang.model.type.TypeKind;
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class JSONProcessor extends AbstractProcessor {
   public static final List<String> HELPERS = List.of(
-      "AnyArrayObserver", "AnyObjectObserver", "Conversions", "JSONArrayObserver",
-      "JSONBuilder", "JSONObjectHandler", "JSONObserver", "JSONParser",
-      "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
+      "AnyArrayObserver", "AnyObjectObserver", "Conversions", "JSONArrayBuilder",
+      "JSONArrayObserver", "JSONBuilder", "JSONObjectHandler", "JSONObserver",
+      "JSONParser", "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
       "SkipArrayObserver", "SkipObserver");
   private boolean helpersEmitted = false;
 
