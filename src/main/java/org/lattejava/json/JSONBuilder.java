@@ -60,6 +60,15 @@ public final class JSONBuilder {
     return this;
   }
 
+  public JSONBuilder bool(String key, Boolean value) {
+    if (value == null) {
+      return omittedNull(key);
+    }
+    writeKey(key);
+    writeRaw(value ? "true" : "false");
+    return this;
+  }
+
   public String build() {
     return new String(buildBytes(), StandardCharsets.UTF_8);
   }
@@ -78,9 +87,36 @@ public final class JSONBuilder {
     return this;
   }
 
+  public JSONBuilder decimal(String key, Double value) {
+    if (value == null) {
+      return omittedNull(key);
+    }
+    writeKey(key);
+    writeRaw(BigDecimal.valueOf(value).toPlainString());
+    return this;
+  }
+
+  public JSONBuilder decimal(String key, Float value) {
+    if (value == null) {
+      return omittedNull(key);
+    }
+    writeKey(key);
+    writeRaw(BigDecimal.valueOf(value.doubleValue()).toPlainString());
+    return this;
+  }
+
   public JSONBuilder integer(String key, long value) {
     writeKey(key);
     writeRaw(Long.toString(value));
+    return this;
+  }
+
+  public JSONBuilder integer(String key, Number value) {
+    if (value == null) {
+      return omittedNull(key);
+    }
+    writeKey(key);
+    writeRaw(value.toString());
     return this;
   }
 

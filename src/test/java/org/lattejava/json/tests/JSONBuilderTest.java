@@ -120,4 +120,36 @@ public class JSONBuilderTest {
     byte[] bytes = new JSONBuilder().string("a", "x").buildBytes();
     assertEquals(new String(bytes, StandardCharsets.UTF_8), "{\"a\":\"x\"}");
   }
+
+  @Test
+  public void boxedNullsOmittedByDefault() {
+    assertEquals(
+        new JSONBuilder().integer("a", (Integer) null).string("b", "x").build(),
+        "{\"b\":\"x\"}");
+    assertEquals(
+        new JSONBuilder().bool("a", (Boolean) null).string("b", "x").build(),
+        "{\"b\":\"x\"}");
+    assertEquals(
+        new JSONBuilder().decimal("c", (Float) null).string("b", "x").build(),
+        "{\"b\":\"x\"}");
+    assertEquals(
+        new JSONBuilder().decimal("d", (Double) null).string("b", "x").build(),
+        "{\"b\":\"x\"}");
+  }
+
+  @Test
+  public void boxedNullsEmittedWhenOmitNullsFalse() {
+    assertEquals(new JSONBuilder(false).integer("a", (Integer) null).build(), "{\"a\":null}");
+    assertEquals(new JSONBuilder(false).bool("a", (Boolean) null).build(), "{\"a\":null}");
+    assertEquals(new JSONBuilder(false).decimal("c", (Float) null).build(), "{\"c\":null}");
+    assertEquals(new JSONBuilder(false).decimal("d", (Double) null).build(), "{\"d\":null}");
+  }
+
+  @Test
+  public void boxedNonNullValuesSerializeCorrectly() {
+    assertEquals(new JSONBuilder().integer("a", Integer.valueOf(7)).build(), "{\"a\":7}");
+    assertEquals(new JSONBuilder().bool("b", Boolean.TRUE).build(), "{\"b\":true}");
+    assertEquals(new JSONBuilder().decimal("c", Float.valueOf(5.5f)).build(), "{\"c\":5.5}");
+    assertEquals(new JSONBuilder().decimal("d", Double.valueOf(6.25)).build(), "{\"d\":6.25}");
+  }
 }

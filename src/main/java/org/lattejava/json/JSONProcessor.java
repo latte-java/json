@@ -123,7 +123,7 @@ public final class JSONProcessor extends AbstractProcessor {
       .append(" implements JSONObserver<").append(simpleName).append("> {\n");
 
     for (RecordComponentElement c : comps) {
-      sb.append("  private ").append(c.asType()).append(' ')
+      sb.append("  private ").append(simpleType(c.asType().toString())).append(' ')
         .append(c.getSimpleName()).append(";\n");
     }
     sb.append('\n');
@@ -172,8 +172,8 @@ public final class JSONProcessor extends AbstractProcessor {
     // Task 5 replaces these bodies with real accumulation/dispatch. For now they must compile.
     sb.append("  @Override public void string(String key, String value) {}\n");
     sb.append("  @Override public void integer(String key, long value) {}\n");
-    sb.append("  @Override public void bigInteger(String key, java.math.BigInteger value) {}\n");
-    sb.append("  @Override public void decimal(String key, java.math.BigDecimal value) {}\n");
+    sb.append("  @Override public void bigInteger(String key, BigInteger value) {}\n");
+    sb.append("  @Override public void decimal(String key, BigDecimal value) {}\n");
     sb.append("  @Override public void bool(String key, boolean value) {}\n");
     sb.append("  @Override public void nullValue(String key) {}\n");
     sb.append("  @Override public JSONObjectHandler beginObject(String key) {\n");
@@ -197,9 +197,11 @@ public final class JSONProcessor extends AbstractProcessor {
       case "byte", "short", "int", "long",
            "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
           "integer(\"" + key + "\", " + accessor + ")";
-      case "float", "double", "java.lang.Float", "java.lang.Double" ->
+      case "float", "double" ->
           "decimal(\"" + key + "\", java.math.BigDecimal.valueOf(" + accessor + "))";
-      default -> throw new IllegalStateException("unreachable: validated type " + t);
+      case "java.lang.Float", "java.lang.Double" ->
+          "decimal(\"" + key + "\", " + accessor + ")";
+      default -> throw new IllegalStateException("unreachable: validated type [" + t + "]");
     };
   }
 
@@ -235,6 +237,22 @@ public final class JSONProcessor extends AbstractProcessor {
   private boolean readStrict(TypeElement record) {
     JSON ann = record.getAnnotation(JSON.class);
     return ann != null && ann.strict();
+  }
+
+  private String simpleType(String fqn) {
+    return switch (fqn) {
+      case "java.lang.Boolean"        -> "Boolean";
+      case "java.lang.Byte"           -> "Byte";
+      case "java.lang.Double"         -> "Double";
+      case "java.lang.Float"          -> "Float";
+      case "java.lang.Integer"        -> "Integer";
+      case "java.lang.Long"           -> "Long";
+      case "java.lang.Short"          -> "Short";
+      case "java.lang.String"         -> "String";
+      case "java.math.BigDecimal"     -> "BigDecimal";
+      case "java.math.BigInteger"     -> "BigInteger";
+      default                         -> fqn;
+    };
   }
 
   private boolean validateComponents(TypeElement record) {

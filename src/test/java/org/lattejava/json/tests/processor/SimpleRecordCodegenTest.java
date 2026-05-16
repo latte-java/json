@@ -69,4 +69,17 @@ public class SimpleRecordCodegenTest {
           "{\"flag\":true,\"b\":1,\"s\":2,\"i\":3,\"l\":4,\"f\":5.5,\"d\":6.25,\"boxedInt\":7,\"boxedLong\":8}");
     }
   }
+
+  @Test
+  public void omitsNullBoxedFieldsByDefault() throws Exception {
+    try (var loader = (URLClassLoader) simple.loader()) {
+      Class<?> p     = loader.loadClass("demo.Primitives");
+      Class<?> pJson = loader.loadClass("demo.internal.PrimitivesJSON");
+      Object obj = p.getConstructor(boolean.class, byte.class, short.class, int.class,
+              long.class, float.class, double.class, Integer.class, Long.class)
+          .newInstance(true, (byte) 1, (short) 2, 3, 4L, 5.5f, 6.25d, null, null);
+      String json = (String) pJson.getMethod("toJSON", p).invoke(null, obj);
+      assertEquals(json, "{\"flag\":true,\"b\":1,\"s\":2,\"i\":3,\"l\":4,\"f\":5.5,\"d\":6.25}");
+    }
+  }
 }
