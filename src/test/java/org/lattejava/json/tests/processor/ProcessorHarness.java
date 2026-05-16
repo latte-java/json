@@ -45,34 +45,35 @@ public final class ProcessorHarness {
 
     // Locate the org.lattejava.json module jar so fixtures can resolve it on the module-path.
     Module jsonModule = JSONProcessor.class.getModule();
-    Path jsonJar = Path.of(jsonModule.getLayer()
+    URI jsonModuleUri = jsonModule.getLayer()
         .configuration()
         .findModule(jsonModule.getName())
         .flatMap(rm -> rm.reference().location())
-        .orElseThrow(() -> new IllegalStateException("Cannot locate module [" + jsonModule.getName() + "]"))
-        .toURL().toURI());
+        .orElseThrow(() -> new IllegalStateException(
+            "Cannot locate module [" + jsonModule.getName() + "]"));
+    Path jsonJar = Path.of(jsonModuleUri);
 
     JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
     var diagCollector = new DiagnosticCollector<JavaFileObject>();
-    StandardJavaFileManager fm = javac.getStandardFileManager(diagCollector, null, StandardCharsets.UTF_8);
-    fm.setLocation(StandardLocation.CLASS_OUTPUT, List.of(out.toFile()));
-    fm.setLocation(StandardLocation.MODULE_PATH, List.of(jsonJar.toFile()));
-    fm.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(out.toFile()));
+    try (StandardJavaFileManager fm =
+             javac.getStandardFileManager(diagCollector, null, StandardCharsets.UTF_8)) {
+      fm.setLocation(StandardLocation.CLASS_OUTPUT, List.of(out.toFile()));
+      fm.setLocation(StandardLocation.MODULE_PATH, List.of(jsonJar.toFile()));
+      fm.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(out.toFile()));
 
-    Iterable<? extends JavaFileObject> units =
-        fm.getJavaFileObjectsFromPaths(sources);
-    JavaCompiler.CompilationTask task = javac.getTask(
-        null, fm, diagCollector,
-        List.of("--release", "25"),
-        null, units);
-    task.setProcessors(List.of(new JSONProcessor()));
-    boolean ok = task.call();
-    fm.close();
+      Iterable<? extends JavaFileObject> units = fm.getJavaFileObjectsFromPaths(sources);
+      JavaCompiler.CompilationTask task = javac.getTask(
+          null, fm, diagCollector,
+          List.of("--release", "25"),
+          null, units);
+      task.setProcessors(List.of(new JSONProcessor()));
+      boolean ok = task.call();
 
-    List<String> diags = new ArrayList<>();
-    for (Diagnostic<? extends JavaFileObject> d : diagCollector.getDiagnostics()) {
-      diags.add(d.getKind() + ": " + d.getMessage(null));
+      List<String> diags = new ArrayList<>();
+      for (Diagnostic<? extends JavaFileObject> d : diagCollector.getDiagnostics()) {
+        diags.add(d.getKind() + ": " + d.getMessage(null));
+      }
+      return new Result(ok, diags, out);
     }
-    return new Result(ok, diags, out);
   }
 }

@@ -22,7 +22,7 @@ public class ProcessorErrorsTest {
   @Test
   public void unsupportedComponentTypeIsRejected() throws Exception {
     var result = ProcessorHarness.compile("badtype");
-    assertFalse(result.success());
+    assertFalse(result.success(), "compilation must fail for an unsupported component type");
     assertTrue(result.diagnostics().stream()
             .anyMatch(d -> d.contains("unsupported") && d.contains("tags")),
         "expected an unsupported-type error mentioning [tags], got: " + result.diagnostics());
@@ -31,7 +31,7 @@ public class ProcessorErrorsTest {
   @Test
   public void missingModuleIsRejected() throws Exception {
     var result = ProcessorHarness.compile("nomodule");
-    assertFalse(result.success());
+    assertFalse(result.success(), "compilation must fail for a @JSON type in an unnamed module");
     assertTrue(result.diagnostics().stream()
             .anyMatch(d -> d.contains("named module")),
         "expected a named-module error, got: " + result.diagnostics());

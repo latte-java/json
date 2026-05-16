@@ -21,10 +21,10 @@ import javax.lang.model.type.TypeKind;
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class JSONProcessor extends AbstractProcessor {
   static final List<String> HELPERS = List.of(
-      "JSONProcessingException", "JSONObjectHandler", "JSONObserver",
-      "JSONArrayObserver", "JSONPolymorphicObserver", "JSONParser",
-      "JSONBuilder", "Numbers", "SkipObserver", "SkipArrayObserver",
-      "AnyObjectObserver", "AnyArrayObserver");
+      "AnyArrayObserver", "AnyObjectObserver", "JSONArrayObserver",
+      "JSONBuilder", "JSONObjectHandler", "JSONObserver", "JSONParser",
+      "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
+      "SkipArrayObserver", "SkipObserver");
 
   private boolean helpersEmitted = false;
 
@@ -72,10 +72,6 @@ public final class JSONProcessor extends AbstractProcessor {
     processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, e);
   }
 
-  private String qualified(Element e) {
-    return e instanceof TypeElement t ? t.getQualifiedName().toString() : e.toString();
-  }
-
   private boolean isSupportedComponentType(TypeMirror t) {
     if (t.getKind().isPrimitive()) {
       return true;
@@ -90,6 +86,10 @@ public final class JSONProcessor extends AbstractProcessor {
       };
     }
     return false;
+  }
+
+  private String qualified(Element e) {
+    return e instanceof TypeElement t ? t.getQualifiedName().toString() : e.toString();
   }
 
   private boolean validateComponents(TypeElement record) {
