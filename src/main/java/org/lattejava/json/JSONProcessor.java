@@ -329,6 +329,8 @@ public final class JSONProcessor extends AbstractProcessor {
           "decimal(\"" + key + "\", " + accessor + ")";
       case "java.math.BigDecimal" -> "decimal(\"" + key + "\", " + accessor + ")";
       case "java.math.BigInteger" -> "bigInteger(\"" + key + "\", " + accessor + ")";
+      case "java.util.UUID" -> "string(\"" + key + "\", " + accessor
+          + " == null ? null : " + accessor + ".toString())";
       // TODO Tasks 2-5: real serialization per type; placeholder keeps companion compilable
       default -> "string(\"" + key + "\", String.valueOf(" + accessor + "))";
     };
