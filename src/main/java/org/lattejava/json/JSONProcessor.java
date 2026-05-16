@@ -117,6 +117,7 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("import ").append(internalPkg).append(".JSONArrayObserver;\n");
     sb.append("import ").append(internalPkg).append(".JSONObjectHandler;\n");
     sb.append("import ").append(internalPkg).append(".JSONParser;\n");
+    sb.append("import ").append(internalPkg).append(".Conversions;\n");
     sb.append("import ").append(internalPkg).append(".JSONProcessingException;\n");
     sb.append("import ").append(internalPkg).append(".Numbers;\n");
     comps.stream()
@@ -195,9 +196,18 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("  @Override public void string(String key, String value) {\n");
     sb.append("    switch (key) {\n");
     for (RecordComponentElement c : comps) {
-      if (c.asType().toString().equals("java.lang.String")) {
+      String tt = c.asType().toString();
+      if (tt.equals("java.lang.String")) {
         sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
           .append(c.getSimpleName()).append(" = value;\n");
+      } else if (isEnum(c.asType())) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = Conversions.toEnum(")
+          .append(lastSegment(tt)).append(".class, value);\n");
+      } else if (stringConversion(tt) != null) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = Conversions.")
+          .append(stringConversion(tt)).append("(value);\n");
       }
     }
     appendDefaultArm(sb, strict, simpleName);
@@ -303,6 +313,9 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String builderCall(RecordComponentElement c, String accessor) {
     String key = c.getSimpleName().toString();
+    if (isEnum(c.asType())) {
+      return "string(\"" + key + "\", " + accessor + " == null ? null : " + accessor + ".name())";
+    }
     String t = c.asType().toString();
     return switch (t) {
       case "java.lang.String" -> "string(\"" + key + "\", " + accessor + ")";
@@ -423,6 +436,20 @@ public final class JSONProcessor extends AbstractProcessor {
       case "java.time.ZonedDateTime"  -> "ZonedDateTime";
       case "java.util.UUID"           -> "UUID";
       default                         -> fqn;
+    };
+  }
+
+  private String stringConversion(String type) {
+    return switch (type) {
+      case "java.time.Duration"       -> "toDuration";
+      case "java.time.Instant"        -> "toInstant";
+      case "java.time.LocalDate"      -> "toLocalDate";
+      case "java.time.LocalDateTime"  -> "toLocalDateTime";
+      case "java.time.OffsetDateTime" -> "toOffsetDateTime";
+      case "java.time.Period"         -> "toPeriod";
+      case "java.time.ZonedDateTime"  -> "toZonedDateTime";
+      case "java.util.UUID"           -> "toUUID";
+      default                         -> null;
     };
   }
 
