@@ -93,7 +93,114 @@ public final class JSONProcessor extends AbstractProcessor {
   }
 
   void generateCompanion(TypeElement record, ModuleElement module) {
-    // Filled in by Task 4 and Task 5.
+    String internalPkg = module.getQualifiedName() + ".internal";
+    String typePkg = processingEnv.getElementUtils().getPackageOf(record).getQualifiedName().toString();
+    String companionPkg = typePkg.isEmpty() ? "internal" : typePkg + ".internal";
+    String simpleName = record.getSimpleName().toString();
+    String companion = simpleName + "JSON";
+    String qualifiedType = record.getQualifiedName().toString();
+
+    List<RecordComponentElement> comps = List.copyOf(record.getRecordComponents());
+    boolean omitNulls = readOmitNulls(record);
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("""
+        /*
+         * Copyright (c) 2026 The Latte Project
+         * SPDX-License-Identifier: MIT
+         */
+        """);
+    sb.append("package ").append(companionPkg).append(";\n\n");
+    sb.append("import module java.base;\n");
+    sb.append("import ").append(qualifiedType).append(";\n");
+    sb.append("import ").append(internalPkg).append(".JSONBuilder;\n");
+    sb.append("import ").append(internalPkg).append(".JSONObserver;\n");
+    sb.append("import ").append(internalPkg).append(".JSONArrayObserver;\n");
+    sb.append("import ").append(internalPkg).append(".JSONObjectHandler;\n");
+    sb.append("import ").append(internalPkg).append(".JSONParser;\n");
+    sb.append("import ").append(internalPkg).append(".Numbers;\n\n");
+    sb.append("public final class ").append(companion)
+      .append(" implements JSONObserver<").append(simpleName).append("> {\n");
+
+    for (RecordComponentElement c : comps) {
+      sb.append("  private ").append(c.asType()).append(' ')
+        .append(c.getSimpleName()).append(";\n");
+    }
+    sb.append('\n');
+
+    sb.append("  public static String toJSON(").append(simpleName).append(" value) {\n");
+    sb.append("    return builder(value).build();\n");
+    sb.append("  }\n\n");
+    sb.append("  public static byte[] toJSONBytes(").append(simpleName).append(" value) {\n");
+    sb.append("    return builder(value).buildBytes();\n");
+    sb.append("  }\n\n");
+    sb.append("  private static JSONBuilder builder(").append(simpleName).append(" value) {\n");
+    sb.append("    return new JSONBuilder(").append(omitNulls).append(")\n");
+    for (RecordComponentElement c : comps) {
+      sb.append("        .").append(builderCall(c, "value." + c.getSimpleName() + "()")).append('\n');
+    }
+    sb.append("        ;\n");
+    sb.append("  }\n\n");
+
+    sb.append("  public static ").append(simpleName).append(" fromJSON(String json) {\n");
+    sb.append("    var observer = new ").append(companion).append("();\n");
+    sb.append("    return new JSONParser().parse(json, observer);\n");
+    sb.append("  }\n\n");
+    sb.append("  public static ").append(simpleName).append(" fromJSON(byte[] json) {\n");
+    sb.append("    var observer = new ").append(companion).append("();\n");
+    sb.append("    return new JSONParser().parse(json, observer);\n");
+    sb.append("  }\n\n");
+
+    appendObserverMethods(sb, record, comps);
+
+    sb.append("}\n");
+
+    try {
+      var file = processingEnv.getFiler().createSourceFile(companionPkg + "." + companion, record);
+      try (Writer w = file.openWriter()) {
+        w.write(sb.toString());
+      }
+    } catch (IOException ioe) {
+      processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+          "Failed writing companion [" + companionPkg + "." + companion + "]: " + ioe.getMessage(),
+          record);
+    }
+  }
+
+  private void appendObserverMethods(StringBuilder sb, TypeElement record,
+                                     List<RecordComponentElement> comps) {
+    // Task 5 replaces these bodies with real accumulation/dispatch. For now they must compile.
+    sb.append("  @Override public void string(String key, String value) {}\n");
+    sb.append("  @Override public void integer(String key, long value) {}\n");
+    sb.append("  @Override public void bigInteger(String key, java.math.BigInteger value) {}\n");
+    sb.append("  @Override public void decimal(String key, java.math.BigDecimal value) {}\n");
+    sb.append("  @Override public void bool(String key, boolean value) {}\n");
+    sb.append("  @Override public void nullValue(String key) {}\n");
+    sb.append("  @Override public JSONObjectHandler beginObject(String key) {\n");
+    sb.append("    throw new IllegalStateException(\"no nested object in this release\");\n");
+    sb.append("  }\n");
+    sb.append("  @Override public void object(String key, Object value) {}\n");
+    sb.append("  @Override public JSONArrayObserver<?> beginArray(String key) {\n");
+    sb.append("    throw new IllegalStateException(\"no array in this release\");\n");
+    sb.append("  }\n");
+    sb.append("  @Override public void array(String key, Object value) {}\n");
+    sb.append("  @Override public ").append(record.getSimpleName())
+      .append(" finish() { return null; }\n");
+  }
+
+  private String builderCall(RecordComponentElement c, String accessor) {
+    String key = c.getSimpleName().toString();
+    String t = c.asType().toString();
+    return switch (t) {
+      case "java.lang.String" -> "string(\"" + key + "\", " + accessor + ")";
+      case "boolean", "java.lang.Boolean" -> "bool(\"" + key + "\", " + accessor + ")";
+      case "byte", "short", "int", "long",
+           "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
+          "integer(\"" + key + "\", " + accessor + ")";
+      case "float", "double", "java.lang.Float", "java.lang.Double" ->
+          "decimal(\"" + key + "\", java.math.BigDecimal.valueOf(" + accessor + "))";
+      default -> throw new IllegalStateException("unreachable: validated type " + t);
+    };
   }
 
   private void error(Element e, String message) {
@@ -118,6 +225,16 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String qualified(Element e) {
     return e instanceof TypeElement t ? t.getQualifiedName().toString() : e.toString();
+  }
+
+  private boolean readOmitNulls(TypeElement record) {
+    JSON ann = record.getAnnotation(JSON.class);
+    return ann == null || ann.omitNulls();
+  }
+
+  private boolean readStrict(TypeElement record) {
+    JSON ann = record.getAnnotation(JSON.class);
+    return ann != null && ann.strict();
   }
 
   private boolean validateComponents(TypeElement record) {
