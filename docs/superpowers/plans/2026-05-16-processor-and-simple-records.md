@@ -398,7 +398,10 @@ Expected: FAIL — `ProcessorHarness` and `JSONProcessor` don't exist (compile e
 package org.lattejava.json.tests.processor;
 
 import module java.base;
+import module java.compiler;
 import module org.lattejava.json;
+
+import javax.tools.ToolProvider;
 
 /**
  * Compiles a fixture set under src/test/resources/fixtures/&lt;name&gt; with {@link JSONProcessor}
@@ -571,9 +574,11 @@ public final class JSONProcessor extends AbstractProcessor {
 }
 ```
 
-- [ ] **Step 4b: Update `src/main/java/module-info.java`**
+- [ ] **Step 4b: Update both `module-info.java` files**
 
-The processor needs the `java.compiler` module (for `javax.annotation.processing` / `javax.lang.model`). Replace the entire contents of `src/main/java/module-info.java` with exactly:
+The processor uses `javax.annotation.processing` / `javax.lang.model` and `ProcessorHarness` uses `javax.tools` — all in the `java.compiler` module. Both the main and test modules must `requires java.compiler;` or compilation fails with "package javax.* is not visible".
+
+Replace the entire contents of `src/main/java/module-info.java` with exactly:
 
 ```java
 /*
@@ -589,7 +594,24 @@ module org.lattejava.json {
 }
 ```
 
-(The `provides` directive is the modular service registration; the `META-INF/services` file in Step 5 covers classpath/unnamed-module consumers. `requires java.compiler;` is mandatory or `JSONProcessor` will not compile — "package javax.annotation.processing is not visible".)
+Replace the entire contents of `src/test/java/module-info.java` with exactly:
+
+```java
+/*
+ * Copyright (c) 2025-2026 The Latte Project
+ * SPDX-License-Identifier: MIT
+ */
+module org.lattejava.json.tests {
+  requires java.compiler;
+  requires org.lattejava.json;
+  requires org.testng;
+
+  opens org.lattejava.json.tests to org.testng;
+  opens org.lattejava.json.tests.processor to org.testng;
+}
+```
+
+(The `provides` directive is the modular service registration; the `META-INF/services` file in Step 5 covers classpath/unnamed-module consumers. `requires` clauses are alphabetized per project convention.)
 
 - [ ] **Step 5: Create the service-registration resource**
 
@@ -609,6 +631,7 @@ Expected: PASS, 3 tests run. (`nonRecordIsRejected`, `unsupportedComponentTypeIs
 ```bash
 git add src/main/java/org/lattejava/json/JSONProcessor.java \
         src/main/java/module-info.java \
+        src/test/java/module-info.java \
         src/main/resources/META-INF/services/javax.annotation.processing.Processor \
         src/test/java/org/lattejava/json/tests/processor/ProcessorHarness.java \
         src/test/java/org/lattejava/json/tests/processor/ProcessorErrorsTest.java
