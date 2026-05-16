@@ -331,8 +331,11 @@ public final class JSONProcessor extends AbstractProcessor {
       case "java.math.BigInteger" -> "bigInteger(\"" + key + "\", " + accessor + ")";
       case "java.util.UUID" -> "string(\"" + key + "\", " + accessor
           + " == null ? null : " + accessor + ".toString())";
-      // TODO Tasks 2-5: real serialization per type; placeholder keeps companion compilable
-      default -> "string(\"" + key + "\", String.valueOf(" + accessor + "))";
+      case "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
+           "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+           "java.time.Duration", "java.time.Period" ->
+          "string(\"" + key + "\", " + accessor + " == null ? null : " + accessor + ".toString())";
+      default -> throw new IllegalStateException("unreachable: validated type [" + t + "]");
     };
   }
 
