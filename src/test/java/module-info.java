@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 module org.lattejava.json.tests {
+  requires java.compiler;
   requires org.lattejava.json;
   requires org.testng;
 

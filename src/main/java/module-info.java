@@ -3,5 +3,9 @@
  * SPDX-License-Identifier: MIT
  */
 module org.lattejava.json {
+  requires java.compiler;
+
   exports org.lattejava.json;
+
+  provides javax.annotation.processing.Processor with org.lattejava.json.JSONProcessor;
 }
