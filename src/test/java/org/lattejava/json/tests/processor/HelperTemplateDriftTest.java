@@ -4,12 +4,10 @@
  */
 package org.lattejava.json.tests.processor;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
+import module java.base;
 import module org.testng;
+
+import java.nio.file.Files;
 
 import static org.testng.Assert.*;
 

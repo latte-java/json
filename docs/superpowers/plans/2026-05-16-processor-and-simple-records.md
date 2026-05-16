@@ -8,7 +8,9 @@
 
 **Tech Stack:** Java 25, `javax.annotation.processing`, `javax.lang.model`, `javax.tools.JavaCompiler`, TestNG 7.10.2, Latte build (`latte build`, `latte test`, `latte test --test=<Class>`). Module imports (`import module java.base;`).
 
-**Spec:** `docs/design/2026-05-12-serialization.md` (authoritative). Conventions: SPDX header `Copyright (c) 2026 The Latte Project` single year; `@author Brian Pontarelli`; `import module java.base;` only (never explicit `import java.*;`); error/diagnostic runtime values in `[brackets]`; members alphabetized within visibility groups; no blank lines between fields. These conventions also apply to **emitted/generated code**.
+**Spec:** `docs/design/2026-05-12-serialization.md` (authoritative). Conventions: SPDX header `Copyright (c) 2026 The Latte Project` single year; `@author Brian Pontarelli`; prefer `import module java.base;` over explicit `import java.*;`; error/diagnostic runtime values in `[brackets]`; members alphabetized within visibility groups; no blank lines between fields. These conventions also apply to **emitted/generated code**.
+
+> **Module-import disambiguation (important):** `import module org.testng;` exports `org.testng.reporters.Files`, which collides with `java.nio.file.Files` from `java.base`. Any TestNG test class that references `Files` must keep `import module java.base;` and add the single explicit disambiguator `import java.nio.file.Files;` (a single-type import wins over on-demand/module imports). Do **not** drop the module import or expand to many explicit imports — add only the one disambiguating line. Test classes that do not import `module org.testng` (e.g. `ProcessorHarness`) are unaffected.
 
 **Scope guardrails (Plan 2 only):**
 - Records only. A `@JSON` class (non-record) is a compile-time error in Plan 2 (full class support is Plan 6).
@@ -104,6 +106,8 @@ package org.lattejava.json.tests.processor;
 
 import module java.base;
 import module org.testng;
+
+import java.nio.file.Files;
 
 import static org.testng.Assert.*;
 
@@ -622,6 +626,8 @@ package org.lattejava.json.tests.processor;
 
 import module java.base;
 import module org.testng;
+
+import java.nio.file.Files;
 
 import static org.testng.Assert.*;
 
