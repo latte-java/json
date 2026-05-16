@@ -122,4 +122,16 @@ public class NumbersTest {
   public void toLongExactBigIntegerRejectsOutOfRange() {
     Numbers.toLongExact(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE));
   }
+
+  @Test
+  public void toBigIntegerExactValid() {
+    assertEquals(Numbers.toBigIntegerExact(new BigDecimal("42")), new BigInteger("42"));
+    assertEquals(Numbers.toBigIntegerExact(new BigDecimal("42.00")), new BigInteger("42"));
+  }
+
+  @Test(expectedExceptions = JSONProcessingException.class,
+        expectedExceptionsMessageRegExp = ".*\\[42.5\\].*BigInteger.*")
+  public void toBigIntegerExactRejectsFractional() {
+    Numbers.toBigIntegerExact(new BigDecimal("42.5"));
+  }
 }

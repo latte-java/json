@@ -17,6 +17,15 @@ public final class Numbers {
   private Numbers() {
   }
 
+  public static BigInteger toBigIntegerExact(BigDecimal value) {
+    try {
+      return value.toBigIntegerExact();
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] is not an integer for [BigInteger]", e);
+    }
+  }
+
   public static byte toByteExact(long value) {
     if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
       throw new JSONProcessingException(
