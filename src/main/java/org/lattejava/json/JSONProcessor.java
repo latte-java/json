@@ -338,7 +338,26 @@ public final class JSONProcessor extends AbstractProcessor {
            "java.time.OffsetDateTime", "java.time.ZonedDateTime",
            "java.time.Duration", "java.time.Period" ->
           "string(\"" + key + "\", " + accessor + " == null ? null : " + accessor + ".toString())";
-      default -> throw new IllegalStateException("unreachable: validated type [" + t + "]");
+      default -> {
+        if (collectionKind(c.asType()) != null) {
+          yield "string(\"" + key + "\", String.valueOf(" + accessor + "))"; // TODO Task 2-4: real collection serialization
+        }
+        throw new IllegalStateException("unreachable: validated type [" + t + "]");
+      }
+    };
+  }
+
+  /** "List" | "Set" | "Map" for the erasure of a java.util collection, else null. */
+  private String collectionKind(TypeMirror t) {
+    if (t.getKind() != TypeKind.DECLARED) {
+      return null;
+    }
+    String raw = processingEnv.getTypeUtils().erasure(t).toString();
+    return switch (raw) {
+      case "java.util.List" -> "List";
+      case "java.util.Map" -> "Map";
+      case "java.util.Set" -> "Set";
+      default -> null;
     };
   }
 
@@ -383,6 +402,18 @@ public final class JSONProcessor extends AbstractProcessor {
     if (t.getKind().isPrimitive()) {
       return true;
     }
+    String ck = collectionKind(t);
+    if (ck != null) {
+      if (ck.equals("Map")) {
+        TypeMirror k = typeArg(t, 0);
+        TypeMirror v = typeArg(t, 1);
+        return k != null && v != null
+            && isStringFormType(k)
+            && collectionKind(v) == null && isSupportedComponentType(v);
+      }
+      TypeMirror e = typeArg(t, 0);
+      return e != null && collectionKind(e) == null && isSupportedComponentType(e);
+    }
     if (t.getKind() == TypeKind.DECLARED) {
       var element = ((javax.lang.model.type.DeclaredType) t).asElement();
       if (element.getKind() == ElementKind.ENUM) {
@@ -402,6 +433,20 @@ public final class JSONProcessor extends AbstractProcessor {
       };
     }
     return false;
+  }
+
+  private boolean isStringFormType(TypeMirror t) {
+    if (t.getKind() == TypeKind.DECLARED
+        && ((javax.lang.model.type.DeclaredType) t).asElement().getKind() == ElementKind.ENUM) {
+      return true;
+    }
+    return switch (t.toString()) {
+      case "java.lang.String", "java.util.UUID",
+           "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
+           "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+           "java.time.Duration", "java.time.Period" -> true;
+      default -> false;
+    };
   }
 
   private String lastSegment(String fqn) {
@@ -461,9 +506,59 @@ public final class JSONProcessor extends AbstractProcessor {
     };
   }
 
+  /** The i-th type argument of a declared parameterized type, or null. */
+  private TypeMirror typeArg(TypeMirror t, int i) {
+    if (t.getKind() != TypeKind.DECLARED) {
+      return null;
+    }
+    var args = ((javax.lang.model.type.DeclaredType) t).getTypeArguments();
+    return i < args.size() ? args.get(i) : null;
+  }
+
   private boolean validateComponents(TypeElement record) {
     boolean ok = true;
     for (RecordComponentElement c : record.getRecordComponents()) {
+      String ck = collectionKind(c.asType());
+      if (ck != null) {
+        if (ck.equals("Map")) {
+          TypeMirror k = typeArg(c.asType(), 0);
+          TypeMirror v = typeArg(c.asType(), 1);
+          if (k == null || !isStringFormType(k)) {
+            error(c, "@JSON component [" + c.getSimpleName() + "] has an unsupported Map key type ["
+                + (k == null ? "?" : k) + "] (Map key must be String, UUID, an enum, or a java.time type)");
+            ok = false;
+            continue;
+          }
+          if (v == null || collectionKind(v) != null) {
+            error(c, "@JSON component [" + c.getSimpleName()
+                + "] uses a nested collection as a Map value [" + (v == null ? "?" : v)
+                + "] which is not supported in this release");
+            ok = false;
+            continue;
+          }
+          if (!isSupportedComponentType(v)) {
+            error(c, "@JSON component [" + c.getSimpleName() + "] has an unsupported Map value type ["
+                + v + "]");
+            ok = false;
+            continue;
+          }
+          continue;
+        }
+        TypeMirror e = typeArg(c.asType(), 0);
+        if (e == null || collectionKind(e) != null) {
+          error(c, "@JSON component [" + c.getSimpleName() + "] uses a nested collection ["
+              + (e == null ? "?" : e) + "] which is not supported in this release");
+          ok = false;
+          continue;
+        }
+        if (!isSupportedComponentType(e)) {
+          error(c, "@JSON component [" + c.getSimpleName() + "] has an unsupported "
+              + ck + " element type [" + e + "]");
+          ok = false;
+          continue;
+        }
+        continue;
+      }
       if (!isSupportedComponentType(c.asType())) {
         error(c, "@JSON component [" + c.getSimpleName() + "] has unsupported type ["
             + c.asType() + "] (supported: primitives, boxed primitives, String, "

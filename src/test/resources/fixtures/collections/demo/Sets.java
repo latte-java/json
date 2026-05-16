@@ -4,5 +4,5 @@ import module java.base;
 import module org.lattejava.json;
 
 @JSON
-public record HasList(String name, java.io.File tags) {
+public record Sets(Set<String> names, Set<Long> codes) {
 }
