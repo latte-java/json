@@ -20,7 +20,7 @@ import javax.lang.model.type.TypeKind;
 @SupportedAnnotationTypes("org.lattejava.json.JSON")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class JSONProcessor extends AbstractProcessor {
-  static final List<String> HELPERS = List.of(
+  public static final List<String> HELPERS = List.of(
       "AnyArrayObserver", "AnyObjectObserver", "JSONArrayObserver",
       "JSONBuilder", "JSONObjectHandler", "JSONObserver", "JSONParser",
       "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
@@ -61,7 +61,35 @@ public final class JSONProcessor extends AbstractProcessor {
   }
 
   void emitHelpers(ModuleElement module) {
-    // Filled in by Task 3.
+    String pkg = module.getQualifiedName() + ".internal";
+    for (String helper : HELPERS) {
+      String resource = "/org/lattejava/json/internal-templates/" + helper + ".java.txt";
+      String body;
+      try (InputStream in = JSONProcessor.class.getResourceAsStream(resource)) {
+        if (in == null) {
+          processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+              "Missing helper template resource [" + resource + "]");
+          return;
+        }
+        body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+      } catch (IOException ioe) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+            "Failed reading helper template [" + resource + "]: " + ioe.getMessage());
+        return;
+      }
+      String rewritten = body.replace(
+          "package org.lattejava.json;", "package " + pkg + ";");
+      try {
+        var file = processingEnv.getFiler().createSourceFile(pkg + "." + helper);
+        try (Writer w = file.openWriter()) {
+          w.write(rewritten);
+        }
+      } catch (IOException ioe) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+            "Failed writing helper [" + pkg + "." + helper + "]: " + ioe.getMessage());
+        return;
+      }
+    }
   }
 
   void generateCompanion(TypeElement record, ModuleElement module) {
