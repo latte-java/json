@@ -69,7 +69,7 @@ Per-type companions live in a separate `<typePackage>.internal` sub-package (see
 
 Helpers are maintained as **ordinary Java source** in this library's source tree — they are compiled and tested as part of this library's own build. That guarantees the templates are valid Java, refactorable in any IDE, and exercisable through a normal test suite before they ever ship.
 
-For distribution, the processor JAR's build step copies those `.java` files into the JAR as text resources (under `META-INF/json-helpers/`). At codegen time, the annotation processor:
+For distribution, the canonical helper `.java` files are checked in as verbatim text-template resources under `src/main/resources/org/lattejava/json/internal-templates/<Name>.java.txt` (a drift-guard test asserts byte-equality with the compiled `src/main/java/org/lattejava/json/<Name>.java` sources so they cannot silently diverge). At codegen time, the annotation processor:
 
 1. Reads each helper resource as a string.
 2. Rewrites the leading `package` statement to point at `<moduleName>.internal`.
@@ -1005,7 +1005,7 @@ Decisions that still need to be made before this design is implementable. Ordere
 
 ### 8. Helper-code distribution
 
-- [x] **How the processor produces `JSONParser`/`JSONBuilder`/`JSONObserver` source.** Hybrid approach: helpers are maintained as ordinary Java source in this library's source tree (compiled and tested as part of this library's build). The processor JAR's build step copies those `.java` files into the JAR as text resources under `META-INF/json-helpers/`. At codegen time, the processor reads each resource, rewrites only the leading `package` statement to `<moduleName>.internal`, and emits via `Filer.createSourceFile`. No extra dependencies (no JavaPoet); helpers stay first-class Java for IDE and refactoring support. See "How the helper source is produced" above.
+- [x] **How the processor produces `JSONParser`/`JSONBuilder`/`JSONObserver` source.** Hybrid approach: helpers are maintained as ordinary Java source in this library's source tree (compiled and tested as part of this library's build), and checked in verbatim as text-template resources under `src/main/resources/org/lattejava/json/internal-templates/<Name>.java.txt`. A drift-guard test (`HelperTemplateDriftTest`) asserts each template is byte-identical to its canonical `src/main/java/org/lattejava/json/<Name>.java` source. At codegen time, the processor reads each resource off its classpath, rewrites only the leading `package` statement to `<moduleName>.internal`, and emits via `Filer.createSourceFile`. No extra dependencies (no JavaPoet); helpers stay first-class Java for IDE and refactoring support. See "How the helper source is produced" above.
 - [x] **Search-for-existing-copy mechanism.** Dropped. The destination package is well-known per module, and the processor tracks emission via a per-invocation `boolean helpersEmitted` flag — writes the helper set on the first round that sees an `@JSON` type, skips on subsequent rounds. `Filer` handles duplicate-write semantics within a round; build tools handle incremental compilation. No project-wide scanning.
 
 ### 9. Annotation surface
