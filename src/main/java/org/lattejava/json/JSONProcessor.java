@@ -289,12 +289,14 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String bigIntegerNarrowing(String type) {
     return switch (type) {
-      case "long", "java.lang.Long" -> "Numbers.toLongExact(value)";
-      case "int", "java.lang.Integer" -> "Numbers.toIntExact(value)";
-      case "short", "java.lang.Short" -> "Numbers.toShortExact(Numbers.toLongExact(value))";
+      case "java.math.BigDecimal" -> "new java.math.BigDecimal(value)";
+      case "java.math.BigInteger" -> "value";
       case "byte", "java.lang.Byte" -> "Numbers.toByteExact(Numbers.toLongExact(value))";
-      case "float", "java.lang.Float" -> "value.floatValue()";
       case "double", "java.lang.Double" -> "value.doubleValue()";
+      case "float", "java.lang.Float" -> "value.floatValue()";
+      case "int", "java.lang.Integer" -> "Numbers.toIntExact(value)";
+      case "long", "java.lang.Long" -> "Numbers.toLongExact(value)";
+      case "short", "java.lang.Short" -> "Numbers.toShortExact(Numbers.toLongExact(value))";
       default -> null;
     };
   }
@@ -312,6 +314,8 @@ public final class JSONProcessor extends AbstractProcessor {
           "decimal(\"" + key + "\", java.math.BigDecimal.valueOf(" + accessor + "))";
       case "java.lang.Float", "java.lang.Double" ->
           "decimal(\"" + key + "\", " + accessor + ")";
+      case "java.math.BigDecimal" -> "decimal(\"" + key + "\", " + accessor + ")";
+      case "java.math.BigInteger" -> "bigInteger(\"" + key + "\", " + accessor + ")";
       // TODO Tasks 2-5: real serialization per type; placeholder keeps companion compilable
       default -> "string(\"" + key + "\", String.valueOf(" + accessor + "))";
     };
@@ -319,12 +323,14 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String decimalNarrowing(String type) {
     return switch (type) {
-      case "float", "java.lang.Float" -> "value.floatValue()";
+      case "java.math.BigDecimal" -> "value";
+      case "java.math.BigInteger" -> "Numbers.toBigIntegerExact(value)";
+      case "byte", "java.lang.Byte" -> "Numbers.toByteExact(Numbers.toLongExact(value))";
       case "double", "java.lang.Double" -> "value.doubleValue()";
+      case "float", "java.lang.Float" -> "value.floatValue()";
       case "int", "java.lang.Integer" -> "Numbers.toIntExact(value)";
       case "long", "java.lang.Long" -> "Numbers.toLongExact(value)";
       case "short", "java.lang.Short" -> "Numbers.toShortExact(Numbers.toLongExact(value))";
-      case "byte", "java.lang.Byte" -> "Numbers.toByteExact(Numbers.toLongExact(value))";
       default -> null;
     };
   }
@@ -335,12 +341,14 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String integerNarrowing(String type) {
     return switch (type) {
-      case "long", "java.lang.Long" -> "value";
-      case "int", "java.lang.Integer" -> "Numbers.toIntExact(value)";
-      case "short", "java.lang.Short" -> "Numbers.toShortExact(value)";
+      case "java.math.BigDecimal" -> "java.math.BigDecimal.valueOf(value)";
+      case "java.math.BigInteger" -> "java.math.BigInteger.valueOf(value)";
       case "byte", "java.lang.Byte" -> "Numbers.toByteExact(value)";
-      case "float", "java.lang.Float" -> "(float) value";
       case "double", "java.lang.Double" -> "(double) value";
+      case "float", "java.lang.Float" -> "(float) value";
+      case "int", "java.lang.Integer" -> "Numbers.toIntExact(value)";
+      case "long", "java.lang.Long" -> "value";
+      case "short", "java.lang.Short" -> "Numbers.toShortExact(value)";
       default -> null;
     };
   }
