@@ -5,6 +5,7 @@
 package org.lattejava.json.tests.processor;
 
 import module java.base;
+import module org.lattejava.json;
 import module org.testng;
 
 import java.nio.file.Files;
@@ -12,15 +13,9 @@ import java.nio.file.Files;
 import static org.testng.Assert.*;
 
 public class HelperTemplateDriftTest {
-  private static final List<String> HELPERS = List.of(
-      "JSONProcessingException", "JSONObjectHandler", "JSONObserver",
-      "JSONArrayObserver", "JSONPolymorphicObserver", "JSONParser",
-      "JSONBuilder", "Numbers", "SkipObserver", "SkipArrayObserver",
-      "AnyObjectObserver", "AnyArrayObserver");
-
   @Test
   public void everyHelperHasATemplate() {
-    for (String name : HELPERS) {
+    for (String name : JSONProcessor.HELPERS) {
       Path tmpl = Path.of("src/main/resources/org/lattejava/json/internal-templates/" + name + ".java.txt");
       assertTrue(Files.exists(tmpl), "Missing template for [" + name + "] at [" + tmpl + "]");
     }
@@ -28,7 +23,7 @@ public class HelperTemplateDriftTest {
 
   @Test
   public void templateIsByteIdenticalToCanonicalSource() throws Exception {
-    for (String name : HELPERS) {
+    for (String name : JSONProcessor.HELPERS) {
       String canonical = Files.readString(
           Path.of("src/main/java/org/lattejava/json/" + name + ".java"), StandardCharsets.UTF_8);
       String template = Files.readString(
@@ -42,7 +37,7 @@ public class HelperTemplateDriftTest {
 
   @Test
   public void canonicalSourcesDeclareTheRewritablePackage() throws Exception {
-    for (String name : HELPERS) {
+    for (String name : JSONProcessor.HELPERS) {
       String canonical = Files.readString(
           Path.of("src/main/java/org/lattejava/json/" + name + ".java"), StandardCharsets.UTF_8);
       assertTrue(canonical.contains("\npackage org.lattejava.json;\n"),

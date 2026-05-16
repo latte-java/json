@@ -25,7 +25,6 @@ public final class JSONProcessor extends AbstractProcessor {
       "JSONBuilder", "JSONObjectHandler", "JSONObserver", "JSONParser",
       "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
       "SkipArrayObserver", "SkipObserver");
-
   private boolean helpersEmitted = false;
 
   @Override
@@ -252,6 +251,9 @@ public final class JSONProcessor extends AbstractProcessor {
         sb.append("      case \"").append(c.getSimpleName())
           .append("\" -> throw new JSONProcessingException(")
           .append("\"null for primitive field [").append(c.getSimpleName()).append("]\");\n");
+      } else {
+        sb.append("      case \"").append(c.getSimpleName())
+          .append("\" -> this.").append(c.getSimpleName()).append(" = null;\n");
       }
     }
     appendDefaultArm(sb, strict, simpleName);
