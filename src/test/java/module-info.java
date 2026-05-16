@@ -7,4 +7,5 @@ module org.lattejava.json.tests {
   requires org.testng;
 
   opens org.lattejava.json.tests to org.testng;
+  opens org.lattejava.json.tests.processor to org.testng;
 }
