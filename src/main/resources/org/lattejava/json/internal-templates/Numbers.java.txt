@@ -4,6 +4,8 @@
  */
 package org.lattejava.json;
 
+import module java.base;
+
 /**
  * Range-checked narrowing helpers for primitive types not covered by the JDK's {@code Math.to*Exact}
  * methods. Each method throws {@link JSONProcessingException} when the source value is outside the target
@@ -21,6 +23,51 @@ public final class Numbers {
           "Value [" + value + "] out of range for [byte]");
     }
     return (byte) value;
+  }
+
+  public static int toIntExact(BigDecimal value) {
+    try {
+      return value.intValueExact();
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] out of range or not an integer for [int]", e);
+    }
+  }
+
+  public static int toIntExact(BigInteger value) {
+    try {
+      return value.intValueExact();
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] out of range for [int]", e);
+    }
+  }
+
+  public static int toIntExact(long value) {
+    try {
+      return Math.toIntExact(value);
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] out of range for [int]", e);
+    }
+  }
+
+  public static long toLongExact(BigDecimal value) {
+    try {
+      return value.longValueExact();
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] out of range or not an integer for [long]", e);
+    }
+  }
+
+  public static long toLongExact(BigInteger value) {
+    try {
+      return value.longValueExact();
+    } catch (ArithmeticException e) {
+      throw new JSONProcessingException(
+          "Value [" + value + "] out of range for [long]", e);
+    }
   }
 
   public static short toShortExact(long value) {

@@ -131,12 +131,20 @@ public class SimpleRecordCodegenTest {
     }
   }
 
-  @Test(expectedExceptions = java.lang.reflect.InvocationTargetException.class)
-  public void intOverflowThrows() throws Exception {
+  @Test
+  public void intOverflowThrowsJSONProcessingException() throws Exception {
     try (var loader = (URLClassLoader) simple.loader()) {
       Class<?> userJson = loader.loadClass("demo.internal.UserJSON");
-      userJson.getMethod("fromJSON", String.class)
-          .invoke(null, "{\"name\":\"X\",\"age\":99999999999999999999}");
+      try {
+        userJson.getMethod("fromJSON", String.class)
+            .invoke(null, "{\"name\":\"X\",\"age\":99999999999999999999}");
+        fail("expected overflow to throw");
+      } catch (java.lang.reflect.InvocationTargetException e) {
+        Throwable cause = e.getCause();
+        assertNotNull(cause, "expected a cause");
+        assertEquals(cause.getClass().getSimpleName(), "JSONProcessingException",
+            "overflow must surface as JSONProcessingException, got: " + cause);
+      }
     }
   }
 }
