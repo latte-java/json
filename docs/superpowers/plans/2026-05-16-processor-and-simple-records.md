@@ -993,7 +993,7 @@ with the following. (This emits the full companion: serialization is functional 
 ```
 
 Notes baked into the design above:
-- `integer(String,long)` accepts `byte/short/int/long` and boxed via autoboxing/widening; for boxed nulls under `omitNulls=true` the value would NPE on widening — Plan 2 fixtures use non-null boxed values, and null-boxed-numeric handling is a Plan 5 field-policy concern (documented limitation; not exercised by Plan 2 tests).
+- Boxed numeric/boolean components route to null-safe `JSONBuilder` overloads (`integer(String,Number)`, `bool(String,Boolean)`, `decimal(String,Float)`, `decimal(String,Double)`) added during Task 4 review; a `null` boxed field is omitted (or emitted as `null` when `omitNulls=false`) rather than throwing. Primitive components keep the `(String,long)` / `BigDecimal.valueOf(...)` paths.
 - `decimal(...)` uses `BigDecimal.valueOf(double|float)`; `JSONBuilder.decimal` emits `toPlainString()`, so `5.5f`→`5.5`, `6.25d`→`6.25`. `BigDecimal.valueOf(float)` widens via `double`; for the Plan-2 fixture values this is exact. General float fidelity is a Plan 3 concern.
 - `String` and boxed nulls are omitted by `JSONBuilder` when `omitNulls` (constructor flag) is true.
 
