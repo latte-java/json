@@ -63,6 +63,7 @@ Under `src/main/resources/org/lattejava/json/internal-templates/`, one `<Name>.j
 
 ### Modify
 - `src/test/java/module-info.java` — add `opens org.lattejava.json.tests.processor to org.testng;`
+- `src/main/java/module-info.java` — add `requires java.compiler;` (mandatory: the processor uses `javax.annotation.processing` / `javax.lang.model`, which live in the `java.compiler` module) and `provides javax.annotation.processing.Processor with org.lattejava.json.JSONProcessor;` (modular service registration; the `META-INF/services` file remains for classpath/unnamed-module consumers).
 
 ---
 
@@ -469,19 +470,9 @@ public final class ProcessorHarness {
 package org.lattejava.json;
 
 import module java.base;
-import javax.annotation.processing.AbstractProcessor;
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
-import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ModuleElement;
-import javax.lang.model.element.RecordComponentElement;
-import javax.lang.model.element.TypeElement;
+import module java.compiler;
+
 import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.tools.Diagnostic;
 
 /**
  * Annotation processor for {@link JSON @JSON}. Plan 2 scope: records whose components are primitives,
@@ -580,6 +571,26 @@ public final class JSONProcessor extends AbstractProcessor {
 }
 ```
 
+- [ ] **Step 4b: Update `src/main/java/module-info.java`**
+
+The processor needs the `java.compiler` module (for `javax.annotation.processing` / `javax.lang.model`). Replace the entire contents of `src/main/java/module-info.java` with exactly:
+
+```java
+/*
+ * Copyright (c) 2025-2026 The Latte Project
+ * SPDX-License-Identifier: MIT
+ */
+module org.lattejava.json {
+  requires java.compiler;
+
+  exports org.lattejava.json;
+
+  provides javax.annotation.processing.Processor with org.lattejava.json.JSONProcessor;
+}
+```
+
+(The `provides` directive is the modular service registration; the `META-INF/services` file in Step 5 covers classpath/unnamed-module consumers. `requires java.compiler;` is mandatory or `JSONProcessor` will not compile — "package javax.annotation.processing is not visible".)
+
 - [ ] **Step 5: Create the service-registration resource**
 
 `src/main/resources/META-INF/services/javax.annotation.processing.Processor` with exactly this single line (no trailing comment):
@@ -597,6 +608,7 @@ Expected: PASS, 3 tests run. (`nonRecordIsRejected`, `unsupportedComponentTypeIs
 
 ```bash
 git add src/main/java/org/lattejava/json/JSONProcessor.java \
+        src/main/java/module-info.java \
         src/main/resources/META-INF/services/javax.annotation.processing.Processor \
         src/test/java/org/lattejava/json/tests/processor/ProcessorHarness.java \
         src/test/java/org/lattejava/json/tests/processor/ProcessorErrorsTest.java
