@@ -116,6 +116,7 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("import module java.base;\n");
     sb.append("import ").append(qualifiedType).append(";\n");
     sb.append("import ").append(internalPkg).append(".Conversions;\n");
+    sb.append("import ").append(internalPkg).append(".JSONArrayBuilder;\n");
     sb.append("import ").append(internalPkg).append(".JSONArrayObserver;\n");
     sb.append("import ").append(internalPkg).append(".JSONBuilder;\n");
     sb.append("import ").append(internalPkg).append(".JSONObjectHandler;\n");
@@ -166,6 +167,37 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("    return new JSONParser().parse(json, observer);\n");
     sb.append("  }\n\n");
 
+    for (RecordComponentElement c : comps) {
+      String ck = collectionKind(c.asType());
+      if (ck == null || ck.equals("Map")) {
+        continue;
+      }
+      TypeMirror elem = typeArg(c.asType(), 0);
+      String dt = declType(c.asType());
+      sb.append("  private static String ").append(c.getSimpleName()).append("ToJSON(")
+        .append(dt).append(" v) {\n");
+      sb.append("    var b = new JSONArrayBuilder();\n");
+      sb.append("    for (var e : v) b").append(arrayAppend(elem, "e")).append(";\n");
+      sb.append("    return b.build();\n");
+      sb.append("  }\n");
+      String obs = cap(c.getSimpleName().toString()) + "ArrayObserver";
+      sb.append("  private static final class ").append(obs)
+        .append(" implements JSONArrayObserver<").append(dt).append("> {\n");
+      sb.append("    private final ").append(dt).append(" acc = new ")
+        .append(ck.equals("Set") ? "java.util.LinkedHashSet" : "java.util.ArrayList")
+        .append("<>();\n");
+      appendElementAccumulator(sb, elem, "acc");
+      appendUnusedArrayObserverStubs(sb, producedElementCallbacks(elem), elem);
+      sb.append("    @Override public ").append(dt).append(" finish() { return acc; }\n");
+      sb.append("    @Override public JSONObjectHandler beginObject() { "
+          + "throw new JSONProcessingException(\"nested objects in collections unsupported\"); }\n");
+      sb.append("    @Override public JSONArrayObserver<?> beginArray() { "
+          + "throw new JSONProcessingException(\"nested collections unsupported\"); }\n");
+      sb.append("    @Override public void object(Object value) {}\n");
+      sb.append("    @Override public void array(Object value) {}\n");
+      sb.append("  }\n");
+    }
+
     appendObserverMethods(sb, record, comps);
 
     sb.append("}\n");
@@ -189,6 +221,33 @@ public final class JSONProcessor extends AbstractProcessor {
     } else {
       sb.append("      default -> { /* lenient: ignore unknown key */ }\n");
     }
+  }
+
+  /** Inner-observer body that accumulates the JSON value into {@code target} (a List/Set) for element type t. */
+  private void appendElementAccumulator(StringBuilder sb, TypeMirror t, String target) {
+    String s = t.toString();
+    if (isEnum(t)) {
+      sb.append("    @Override public void string(String value) { ").append(target)
+        .append(".add(Conversions.toEnum(").append(lastSegment(s)).append(".class, value)); }\n");
+    } else if (s.equals("java.lang.String")) {
+      sb.append("    @Override public void string(String value) { ").append(target).append(".add(value); }\n");
+    } else if (s.equals("java.util.UUID")) {
+      sb.append("    @Override public void string(String value) { ").append(target)
+        .append(".add(Conversions.toUUID(value)); }\n");
+    } else if (stringConversion(s) != null) {
+      sb.append("    @Override public void string(String value) { ").append(target)
+        .append(".add(Conversions.").append(stringConversion(s)).append("(value)); }\n");
+    } else if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
+      sb.append("    @Override public void bool(boolean value) { ").append(target).append(".add(value); }\n");
+    } else {
+      sb.append("    @Override public void integer(long value) { ").append(target).append(".add(")
+        .append(integerNarrowing(s)).append("); }\n");
+      sb.append("    @Override public void bigInteger(java.math.BigInteger value) { ").append(target)
+        .append(".add(").append(bigIntegerNarrowing(s)).append("); }\n");
+      sb.append("    @Override public void decimal(java.math.BigDecimal value) { ").append(target)
+        .append(".add(").append(decimalNarrowing(s)).append("); }\n");
+    }
+    sb.append("    @Override public void nullValue() { ").append(target).append(".add(null); }\n");
   }
 
   private void appendObserverMethods(StringBuilder sb, TypeElement record,
@@ -287,9 +346,30 @@ public final class JSONProcessor extends AbstractProcessor {
     sb.append("  }\n");
     sb.append("  @Override public void object(String key, Object value) {}\n");
     sb.append("  @Override public JSONArrayObserver<?> beginArray(String key) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String ck = collectionKind(c.asType());
+      if ("List".equals(ck) || "Set".equals(ck)) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> { return new ")
+          .append(cap(c.getSimpleName().toString())).append("ArrayObserver(); }\n");
+      }
+    }
+    sb.append("    }\n");
     sb.append("    throw new IllegalStateException(\"arrays unsupported in this release\");\n");
     sb.append("  }\n");
-    sb.append("  @Override public void array(String key, Object value) {}\n");
+    sb.append("  @SuppressWarnings(\"unchecked\")\n");
+    sb.append("  @Override public void array(String key, Object value) {\n");
+    sb.append("    switch (key) {\n");
+    for (RecordComponentElement c : comps) {
+      String ck = collectionKind(c.asType());
+      if ("List".equals(ck) || "Set".equals(ck)) {
+        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
+          .append(c.getSimpleName()).append(" = (").append(declType(c.asType()))
+          .append(") value;\n");
+      }
+    }
+    appendDefaultArm(sb, strict, simpleName);
+    sb.append("    }\n  }\n");
 
     sb.append("  @Override public ").append(simpleName).append(" finish() {\n");
     sb.append("    return new ").append(simpleName).append("(");
@@ -298,6 +378,60 @@ public final class JSONProcessor extends AbstractProcessor {
       sb.append("this.").append(comps.get(i).getSimpleName());
     }
     sb.append(");\n  }\n");
+  }
+
+  /**
+   * Emits throwing stubs for every scalar element callback that {@link #appendElementAccumulator}
+   * did not produce, so the generated inner observer is a concrete class.
+   */
+  private void appendUnusedArrayObserverStubs(StringBuilder sb, Set<String> producedCallbacks,
+                                              TypeMirror elementType) {
+    String et = elementType.toString();
+    String msg = "throw new JSONProcessingException(\"unexpected JSON value for element type ["
+        + et + "]\")";
+    if (!producedCallbacks.contains("string")) {
+      sb.append("    @Override public void string(String value) { ").append(msg).append("; }\n");
+    }
+    if (!producedCallbacks.contains("integer")) {
+      sb.append("    @Override public void integer(long value) { ").append(msg).append("; }\n");
+    }
+    if (!producedCallbacks.contains("bigInteger")) {
+      sb.append("    @Override public void bigInteger(java.math.BigInteger value) { ")
+        .append(msg).append("; }\n");
+    }
+    if (!producedCallbacks.contains("decimal")) {
+      sb.append("    @Override public void decimal(java.math.BigDecimal value) { ")
+        .append(msg).append("; }\n");
+    }
+    if (!producedCallbacks.contains("bool")) {
+      sb.append("    @Override public void bool(boolean value) { ").append(msg).append("; }\n");
+    }
+  }
+
+  /** JSONArrayBuilder call to append one element {@code expr} of type {@code t} (scalar/extra only). */
+  private String arrayAppend(TypeMirror t, String expr) {
+    if (isEnum(t)) {
+      return ".string(" + expr + " == null ? null : " + expr + ".name())";
+    }
+    String s = t.toString();
+    return switch (s) {
+      case "java.lang.String" -> ".string(" + expr + ")";
+      case "boolean", "java.lang.Boolean" -> ".bool(" + expr + ")";
+      case "byte", "short", "int", "long",
+           "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
+          ".integer(" + expr + ")";
+      case "float", "double" -> ".decimal(java.math.BigDecimal.valueOf(" + expr + "))";
+      case "java.lang.Float", "java.lang.Double" -> ".decimal(" + expr + " == null ? null : "
+          + "java.math.BigDecimal.valueOf(" + expr + "))";
+      case "java.math.BigInteger" -> ".bigInteger(" + expr + ")";
+      case "java.math.BigDecimal" -> ".decimal(" + expr + ")";
+      case "java.util.UUID" -> ".string(" + expr + " == null ? null : " + expr + ".toString())";
+      case "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
+           "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+           "java.time.Duration", "java.time.Period" ->
+          ".string(" + expr + " == null ? null : " + expr + ".toString())";
+      default -> throw new IllegalStateException("unreachable element type [" + s + "]");
+    };
   }
 
   private String bigIntegerNarrowing(String type) {
@@ -339,12 +473,22 @@ public final class JSONProcessor extends AbstractProcessor {
            "java.time.Duration", "java.time.Period" ->
           "string(\"" + key + "\", " + accessor + " == null ? null : " + accessor + ".toString())";
       default -> {
-        if (collectionKind(c.asType()) != null) {
-          yield "string(\"" + key + "\", String.valueOf(" + accessor + "))"; // TODO Task 2-4: real collection serialization
+        String ck = collectionKind(c.asType());
+        if ("List".equals(ck) || "Set".equals(ck)) {
+          yield "array(\"" + key + "\", " + accessor + " == null ? null : "
+              + c.getSimpleName() + "ToJSON(" + accessor + "))";
+        }
+        if (ck != null) {
+          yield "string(\"" + key + "\", String.valueOf(" + accessor + "))"; // TODO Task 4: real Map serialization
         }
         throw new IllegalStateException("unreachable: validated type [" + t + "]");
       }
     };
+  }
+
+  /** Capitalizes the first character of {@code name} for use in a generated inner-class name. */
+  private String cap(String name) {
+    return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
   }
 
   /** "List" | "Set" | "Map" for the erasure of a java.util collection, else null. */
@@ -373,6 +517,22 @@ public final class JSONProcessor extends AbstractProcessor {
       case "short", "java.lang.Short" -> "Numbers.toShortExact(Numbers.toLongExact(value))";
       default -> null;
     };
+  }
+
+  /**
+   * The component's declared type rendered so generated code compiles under
+   * {@code import module java.base} (e.g. {@code List<String>}, {@code Set<Long>}). Element/key/value
+   * enum types reduce to their simple name (enums already get a per-enum import).
+   */
+  private String declType(TypeMirror t) {
+    String ck = collectionKind(t);
+    if (ck == null) {
+      return isEnum(t) ? lastSegment(t.toString()) : simpleType(t.toString());
+    }
+    if (ck.equals("Map")) {
+      return "Map<" + declType(typeArg(t, 0)) + ", " + declType(typeArg(t, 1)) + ">";
+    }
+    return ck + "<" + declType(typeArg(t, 0)) + ">";
   }
 
   private void error(Element e, String message) {
@@ -452,6 +612,22 @@ public final class JSONProcessor extends AbstractProcessor {
   private String lastSegment(String fqn) {
     int i = fqn.lastIndexOf('.');
     return i < 0 ? fqn : fqn.substring(i + 1);
+  }
+
+  /**
+   * The scalar element callbacks {@link #appendElementAccumulator} emits for element type {@code t}
+   * ({@code nullValue} is always produced and therefore not listed here).
+   */
+  private Set<String> producedElementCallbacks(TypeMirror t) {
+    String s = t.toString();
+    if (isEnum(t) || s.equals("java.lang.String") || s.equals("java.util.UUID")
+        || stringConversion(s) != null) {
+      return Set.of("string");
+    }
+    if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
+      return Set.of("bool");
+    }
+    return Set.of("integer", "bigInteger", "decimal");
   }
 
   private String qualified(Element e) {
