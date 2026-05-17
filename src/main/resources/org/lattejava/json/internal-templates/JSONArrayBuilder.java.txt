@@ -37,6 +37,13 @@ public final class JSONArrayBuilder {
     return this;
   }
 
+  public JSONArrayBuilder bool(Boolean value) {
+    if (value == null) {
+      return nullValue();
+    }
+    return bool(value.booleanValue());
+  }
+
   public String build() {
     return new String(buildBytes(), StandardCharsets.UTF_8);
   }
@@ -59,6 +66,13 @@ public final class JSONArrayBuilder {
     sep();
     writeRaw(Long.toString(value));
     return this;
+  }
+
+  public JSONArrayBuilder integer(Long value) {
+    if (value == null) {
+      return nullValue();
+    }
+    return integer(value.longValue());
   }
 
   public JSONArrayBuilder nullValue() {

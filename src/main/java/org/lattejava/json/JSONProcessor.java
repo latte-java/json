@@ -223,7 +223,11 @@ public final class JSONProcessor extends AbstractProcessor {
     }
   }
 
-  /** Inner-observer body that accumulates the JSON value into {@code target} (a List/Set) for element type t. */
+  /**
+   * Inner-observer body that accumulates the JSON value into {@code target} (a List/Set) for element type t.
+   * Invariant pair with {@link #producedElementCallbacks}: their type-dispatch predicates MUST stay
+   * parallel (a callback emitted here must be reported there, and vice versa). Tasks 3/4 inherit this.
+   */
   private void appendElementAccumulator(StringBuilder sb, TypeMirror t, String target) {
     String s = t.toString();
     if (isEnum(t)) {
@@ -416,10 +420,11 @@ public final class JSONProcessor extends AbstractProcessor {
     String s = t.toString();
     return switch (s) {
       case "java.lang.String" -> ".string(" + expr + ")";
-      case "boolean", "java.lang.Boolean" -> ".bool(" + expr + ")";
-      case "byte", "short", "int", "long",
-           "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
-          ".integer(" + expr + ")";
+      case "boolean" -> ".bool(" + expr + ")";
+      case "java.lang.Boolean" -> ".bool(" + expr + ")";
+      case "byte", "short", "int", "long" -> ".integer(" + expr + ")";
+      case "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
+          ".integer(" + expr + " == null ? null : " + expr + ".longValue())";
       case "float", "double" -> ".decimal(java.math.BigDecimal.valueOf(" + expr + "))";
       case "java.lang.Float", "java.lang.Double" -> ".decimal(" + expr + " == null ? null : "
           + "java.math.BigDecimal.valueOf(" + expr + "))";
@@ -616,7 +621,9 @@ public final class JSONProcessor extends AbstractProcessor {
 
   /**
    * The scalar element callbacks {@link #appendElementAccumulator} emits for element type {@code t}
-   * ({@code nullValue} is always produced and therefore not listed here).
+   * ({@code nullValue} is always produced and therefore not listed here). Invariant pair with
+   * {@link #appendElementAccumulator}: their type-dispatch predicates MUST stay parallel. Tasks 3/4
+   * inherit this.
    */
   private Set<String> producedElementCallbacks(TypeMirror t) {
     String s = t.toString();

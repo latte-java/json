@@ -56,6 +56,17 @@ public class ListCodegenTest {
   }
 
   @Test
+  public void nullNumericElementIsPreserved() throws Exception {
+    try (var loader = (URLClassLoader) coll.loader()) {
+      Class<?> lists = loader.loadClass("demo.Lists");
+      Class<?> listsJson = loader.loadClass("demo.internal.ListsJSON");
+      String json = "{\"tags\":[],\"nums\":[1,null,3],\"ids\":[]}";
+      Object o = listsJson.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(listsJson.getMethod("toJSON", lists).invoke(null, o), json);
+    }
+  }
+
+  @Test
   public void nullListOmittedByDefault() throws Exception {
     try (var loader = (URLClassLoader) coll.loader()) {
       Class<?> lists = loader.loadClass("demo.Lists");

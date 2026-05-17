@@ -52,6 +52,27 @@ public class JSONArrayBuilderTest {
   }
 
   @Test
+  public void boxedBooleanNullIsPreserved() {
+    assertEquals(new JSONArrayBuilder().bool((Boolean) null).build(), "[null]");
+  }
+
+  @Test
+  public void boxedBooleanNonNullEmitsValue() {
+    assertEquals(new JSONArrayBuilder().bool(Boolean.TRUE).bool(Boolean.FALSE).build(),
+        "[true,false]");
+  }
+
+  @Test
+  public void boxedLongNonNullEmitsValue() {
+    assertEquals(new JSONArrayBuilder().integer(Long.valueOf(7L)).build(), "[7]");
+  }
+
+  @Test
+  public void boxedLongNullIsPreserved() {
+    assertEquals(new JSONArrayBuilder().integer((Long) null).build(), "[null]");
+  }
+
+  @Test
   public void buildBytesUtf8() {
     byte[] b = new JSONArrayBuilder().string("x").buildBytes();
     assertEquals(new String(b, StandardCharsets.UTF_8), "[\"x\"]");
