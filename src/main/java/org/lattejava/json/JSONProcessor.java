@@ -398,6 +398,20 @@ public final class JSONProcessor extends AbstractProcessor {
         && ((javax.lang.model.type.DeclaredType) t).asElement().getKind() == ElementKind.ENUM;
   }
 
+  private boolean isStringFormType(TypeMirror t) {
+    if (t.getKind() == TypeKind.DECLARED
+        && ((javax.lang.model.type.DeclaredType) t).asElement().getKind() == ElementKind.ENUM) {
+      return true;
+    }
+    return switch (t.toString()) {
+      case "java.lang.String", "java.util.UUID",
+           "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
+           "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+           "java.time.Duration", "java.time.Period" -> true;
+      default -> false;
+    };
+  }
+
   private boolean isSupportedComponentType(TypeMirror t) {
     if (t.getKind().isPrimitive()) {
       return true;
@@ -433,20 +447,6 @@ public final class JSONProcessor extends AbstractProcessor {
       };
     }
     return false;
-  }
-
-  private boolean isStringFormType(TypeMirror t) {
-    if (t.getKind() == TypeKind.DECLARED
-        && ((javax.lang.model.type.DeclaredType) t).asElement().getKind() == ElementKind.ENUM) {
-      return true;
-    }
-    return switch (t.toString()) {
-      case "java.lang.String", "java.util.UUID",
-           "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
-           "java.time.OffsetDateTime", "java.time.ZonedDateTime",
-           "java.time.Duration", "java.time.Period" -> true;
-      default -> false;
-    };
   }
 
   private String lastSegment(String fqn) {
