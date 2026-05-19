@@ -21,17 +21,22 @@ public final class Template {
   }
 
   /**
-   * Maps {@code items} through {@code render} and joins the results with {@code separator}. Empty input yields the
-   * empty string (so the enclosing hole collapses and its line is dropped).
+   * Maps {@code items} through {@code render} and joins the non-{@code null} results with {@code separator}. A
+   * {@code null} result is skipped entirely — it contributes neither text nor a separator. Empty input (or all-null
+   * results) yields the empty string (so the enclosing hole collapses and its line is dropped).
    */
   public static <T> String join(Collection<T> items, Function<T, String> render, String separator) {
     StringBuilder sb = new StringBuilder();
     boolean first = true;
     for (T item : items) {
+      String rendered = render.apply(item);
+      if (rendered == null) {
+        continue;
+      }
       if (!first) {
         sb.append(separator);
       }
-      sb.append(render.apply(item));
+      sb.append(rendered);
       first = false;
     }
     return sb.toString();

@@ -109,4 +109,11 @@ public class TemplateTest {
   public void unterminatedHoleThrows() {
     Template.of("a {{b").render(Map.of("b", "x"));
   }
+
+  @Test
+  public void joinSkipsNullResults() {
+    String out = Template.join(List.of("a", "b", "c"),
+        s -> s.equals("b") ? null : "[" + s + "]", "\n");
+    assertEquals(out, "[a]\n[c]");
+  }
 }

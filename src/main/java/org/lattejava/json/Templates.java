@@ -67,6 +67,74 @@ public final class Templates {
       }
       """;
 
+  public static final String OBSERVER_BODY = """
+        @Override public void string(String key, String value) {
+          switch (key) {
+      {{stringCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public void integer(String key, long value) {
+          switch (key) {
+      {{integerCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public void bigInteger(String key, BigInteger value) {
+          switch (key) {
+      {{bigIntegerCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public void decimal(String key, BigDecimal value) {
+          switch (key) {
+      {{decimalCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public void bool(String key, boolean value) {
+          switch (key) {
+      {{boolCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public void nullValue(String key) {
+          switch (key) {
+      {{nullCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public JSONObjectHandler beginObject(String key) {
+          switch (key) {
+      {{beginObjectCases}}
+          }
+          throw new IllegalStateException("nested objects unsupported in this release");
+        }
+        @SuppressWarnings("unchecked")
+        @Override public void object(String key, Object value) {
+          switch (key) {
+      {{objectCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public JSONArrayObserver<?> beginArray(String key) {
+          switch (key) {
+      {{beginArrayCases}}
+          }
+          throw new IllegalStateException("arrays unsupported in this release");
+        }
+        @SuppressWarnings("unchecked")
+        @Override public void array(String key, Object value) {
+          switch (key) {
+      {{arrayCases}}
+      {{defaultArm}}
+          }
+        }
+        @Override public {{simpleName}} finish() {
+          return new {{simpleName}}({{ctorArgs}});
+        }
+      """;
+
   private Templates() {
   }
 }

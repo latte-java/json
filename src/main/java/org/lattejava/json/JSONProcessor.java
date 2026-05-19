@@ -189,13 +189,19 @@ public final class JSONProcessor extends AbstractProcessor {
     }
   }
 
-  private void appendDefaultArm(StringBuilder sb, boolean strict, String simpleName) {
-    if (strict) {
-      sb.append("      default -> throw new JSONProcessingException(\"Unknown JSON key [\" + key + \"] for type [")
-        .append(simpleName).append("]\");\n");
-    } else {
-      sb.append("      default -> { /* lenient: ignore unknown key */ }\n");
-    }
+  /**
+   * Maps {@code comps} to {@code "      case \"name\" -> this.name = "} prefixed arms, skipping any component whose
+   * {@code narrowing} function returns {@code null} (not applicable to this numeric callback).
+   */
+  private String narrowingCases(List<RecordComponentElement> comps,
+                                Function<String, String> narrowing) {
+    return Template.join(comps, c -> {
+      String narrow = narrowing.apply(c.asType().toString());
+      if (narrow == null) {
+        return null;
+      }
+      return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = " + narrow + ";";
+    }, "\n");
   }
 
   /**
@@ -304,148 +310,91 @@ public final class JSONProcessor extends AbstractProcessor {
     boolean strict = readStrict(record);
     String simpleName = record.getSimpleName().toString();
 
-    sb.append("  @Override public void string(String key, String value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+    String defaultArm = strict
+        ? "      default -> throw new JSONProcessingException(\"Unknown JSON key [\" + key + \"] for type ["
+          + simpleName + "]\");"
+        : "      default -> { /* lenient: ignore unknown key */ }";
+
+    String stringCases = Template.join(comps, c -> {
       String tt = c.asType().toString();
       if (tt.equals("java.lang.String")) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = value;\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
       } else if (isEnum(c.asType())) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = Conversions.toEnum(")
-          .append(lastSegment(tt)).append(".class, value);\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+            + " = Conversions.toEnum(" + lastSegment(tt) + ".class, value);";
       } else if (stringConversion(tt) != null) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = Conversions.")
-          .append(stringConversion(tt)).append("(value);\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+            + " = Conversions." + stringConversion(tt) + "(value);";
       }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
+      return null;
+    }, "\n");
 
-    sb.append("  @Override public void integer(String key, long value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
-      String t = c.asType().toString();
-      String narrow = integerNarrowing(t);
-      if (narrow != null) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
-      }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
-
-    sb.append("  @Override public void bigInteger(String key, BigInteger value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
-      String t = c.asType().toString();
-      String narrow = bigIntegerNarrowing(t);
-      if (narrow != null) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
-      }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
-
-    sb.append("  @Override public void decimal(String key, BigDecimal value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
-      String t = c.asType().toString();
-      String narrow = decimalNarrowing(t);
-      if (narrow != null) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = ").append(narrow).append(";\n");
-      }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
-
-    sb.append("  @Override public void bool(String key, boolean value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+    String boolCases = Template.join(comps, c -> {
       String t = c.asType().toString();
       if (t.equals("boolean") || t.equals("java.lang.Boolean")) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = value;\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
       }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
+      return null;
+    }, "\n");
 
-    sb.append("  @Override public void nullValue(String key) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+    String nullCases = Template.join(comps, c -> {
       if (c.asType().getKind().isPrimitive()) {
-        sb.append("      case \"").append(c.getSimpleName())
-          .append("\" -> throw new JSONProcessingException(")
-          .append("\"null for primitive field [").append(c.getSimpleName()).append("]\");\n");
-      } else {
-        sb.append("      case \"").append(c.getSimpleName())
-          .append("\" -> this.").append(c.getSimpleName()).append(" = null;\n");
+        return "      case \"" + c.getSimpleName() + "\" -> throw new JSONProcessingException("
+            + "\"null for primitive field [" + c.getSimpleName() + "]\");";
       }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
+      return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = null;";
+    }, "\n");
 
-    sb.append("  @Override public JSONObjectHandler beginObject(String key) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+    String beginObjectCases = Template.join(comps, c -> {
       if ("Map".equals(collectionKind(c.asType()))) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> { return new ")
-          .append(cap(c.getSimpleName().toString())).append("MapObserver(); }\n");
+        return "      case \"" + c.getSimpleName() + "\" -> { return new "
+            + cap(c.getSimpleName().toString()) + "MapObserver(); }";
       }
-    }
-    sb.append("    }\n");
-    sb.append("    throw new IllegalStateException(\"nested objects unsupported in this release\");\n");
-    sb.append("  }\n");
-    sb.append("  @SuppressWarnings(\"unchecked\")\n");
-    sb.append("  @Override public void object(String key, Object value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+      return null;
+    }, "\n");
+
+    String objectCases = Template.join(comps, c -> {
       if ("Map".equals(collectionKind(c.asType()))) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = (").append(declType(c.asType()))
-          .append(") value;\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+            + " = (" + declType(c.asType()) + ") value;";
       }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
-    sb.append("  @Override public JSONArrayObserver<?> beginArray(String key) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+      return null;
+    }, "\n");
+
+    String beginArrayCases = Template.join(comps, c -> {
       String ck = collectionKind(c.asType());
       if ("List".equals(ck) || "Set".equals(ck)) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> { return new ")
-          .append(cap(c.getSimpleName().toString())).append("ArrayObserver(); }\n");
+        return "      case \"" + c.getSimpleName() + "\" -> { return new "
+            + cap(c.getSimpleName().toString()) + "ArrayObserver(); }";
       }
-    }
-    sb.append("    }\n");
-    sb.append("    throw new IllegalStateException(\"arrays unsupported in this release\");\n");
-    sb.append("  }\n");
-    sb.append("  @SuppressWarnings(\"unchecked\")\n");
-    sb.append("  @Override public void array(String key, Object value) {\n");
-    sb.append("    switch (key) {\n");
-    for (RecordComponentElement c : comps) {
+      return null;
+    }, "\n");
+
+    String arrayCases = Template.join(comps, c -> {
       String ck = collectionKind(c.asType());
       if ("List".equals(ck) || "Set".equals(ck)) {
-        sb.append("      case \"").append(c.getSimpleName()).append("\" -> this.")
-          .append(c.getSimpleName()).append(" = (").append(declType(c.asType()))
-          .append(") value;\n");
+        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+            + " = (" + declType(c.asType()) + ") value;";
       }
-    }
-    appendDefaultArm(sb, strict, simpleName);
-    sb.append("    }\n  }\n");
+      return null;
+    }, "\n");
 
-    sb.append("  @Override public ").append(simpleName).append(" finish() {\n");
-    sb.append("    return new ").append(simpleName).append("(");
-    for (int i = 0; i < comps.size(); i++) {
-      if (i > 0) sb.append(", ");
-      sb.append("this.").append(comps.get(i).getSimpleName());
-    }
-    sb.append(");\n  }\n");
+    String ctorArgs = Template.join(comps, c -> "this." + c.getSimpleName(), ", ");
+
+    sb.append(Template.of(Templates.OBSERVER_BODY).render(Map.ofEntries(
+        Map.entry("stringCases", stringCases),
+        Map.entry("integerCases", narrowingCases(comps, this::integerNarrowing)),
+        Map.entry("bigIntegerCases", narrowingCases(comps, this::bigIntegerNarrowing)),
+        Map.entry("decimalCases", narrowingCases(comps, this::decimalNarrowing)),
+        Map.entry("boolCases", boolCases),
+        Map.entry("nullCases", nullCases),
+        Map.entry("beginObjectCases", beginObjectCases),
+        Map.entry("objectCases", objectCases),
+        Map.entry("beginArrayCases", beginArrayCases),
+        Map.entry("arrayCases", arrayCases),
+        Map.entry("defaultArm", defaultArm),
+        Map.entry("simpleName", simpleName),
+        Map.entry("ctorArgs", ctorArgs))));
   }
 
   /**

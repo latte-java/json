@@ -31,7 +31,14 @@ public class ScaffoldingIndentationTest {
         "string(...) observer must be at 2-space indent; companion was:\n" + src);
     assertTrue(src.contains("\n    switch (key) {\n"),
         "switch must be at 4-space indent; companion was:\n" + src);
-    // The over-indent bug produced this 4-space signature — it must NOT appear.
+    assertTrue(src.contains("\n  @Override public void nullValue(String key) {\n"),
+        "non-first observer (nullValue) must be at 2-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n      case "),
+        "case arms must be at 6-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n  @Override public ") && src.contains(" finish() {\n"),
+        "finish() must be a 2-space member; companion was:\n" + src);
+    // Guards against the body-block over-indentation regression: every observer method is a
+    // 2-space class member, so its @Override signature must never appear at a 4-space indent.
     assertFalse(src.contains("\n    @Override public void string(String key, String value) {\n"),
         "string(...) observer is over-indented (4 spaces); companion was:\n" + src);
   }
