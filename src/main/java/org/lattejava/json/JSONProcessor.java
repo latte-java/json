@@ -27,6 +27,8 @@ public final class JSONProcessor extends AbstractProcessor {
       "JSONArrayObserver", "JSONBuilder", "JSONObjectHandler", "JSONObserver",
       "JSONParser", "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
       "SkipArrayObserver", "SkipObserver");
+  // 4-space observer-class body indent; net-zero indentation contract — see generateCompanion
+  private static final String OBSERVER_BODY_INDENT = "    ";
   private boolean helpersEmitted = false;
 
   @Override
@@ -206,27 +208,27 @@ public final class JSONProcessor extends AbstractProcessor {
     String s = t.toString();
     List<String> lines = new ArrayList<>();
     if (isEnum(t)) {
-      lines.add("    @Override public void string(String value) { " + target
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String value) { " + target
           + ".add(Conversions.toEnum(" + lastSegment(s) + ".class, value)); }");
     } else if (s.equals("java.lang.String")) {
-      lines.add("    @Override public void string(String value) { " + target + ".add(value); }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String value) { " + target + ".add(value); }");
     } else if (s.equals("java.util.UUID")) {
-      lines.add("    @Override public void string(String value) { " + target
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String value) { " + target
           + ".add(Conversions.toUUID(value)); }");
     } else if (stringConversion(s) != null) {
-      lines.add("    @Override public void string(String value) { " + target
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String value) { " + target
           + ".add(Conversions." + stringConversion(s) + "(value)); }");
     } else if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
-      lines.add("    @Override public void bool(boolean value) { " + target + ".add(value); }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bool(boolean value) { " + target + ".add(value); }");
     } else {
-      lines.add("    @Override public void integer(long value) { " + target + ".add("
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void integer(long value) { " + target + ".add("
           + integerNarrowing(s) + "); }");
-      lines.add("    @Override public void bigInteger(java.math.BigInteger value) { " + target
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bigInteger(java.math.BigInteger value) { " + target
           + ".add(" + bigIntegerNarrowing(s) + "); }");
-      lines.add("    @Override public void decimal(java.math.BigDecimal value) { " + target
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void decimal(java.math.BigDecimal value) { " + target
           + ".add(" + decimalNarrowing(s) + "); }");
     }
-    lines.add("    @Override public void nullValue() { " + target + ".add(null); }");
+    lines.add(OBSERVER_BODY_INDENT + "@Override public void nullValue() { " + target + ".add(null); }");
     return String.join("\n", lines);
   }
 
@@ -264,26 +266,26 @@ public final class JSONProcessor extends AbstractProcessor {
     String s = v.toString();
     List<String> lines = new ArrayList<>();
     if (isEnum(v)) {
-      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String key, String value) { map.put(" + key
           + ", Conversions.toEnum(" + lastSegment(s) + ".class, value)); }");
     } else if (s.equals("java.lang.String")) {
-      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String key, String value) { map.put(" + key
           + ", value); }");
     } else if (s.equals("java.util.UUID")) {
-      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String key, String value) { map.put(" + key
           + ", Conversions.toUUID(value)); }");
     } else if (stringConversion(s) != null) {
-      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String key, String value) { map.put(" + key
           + ", Conversions." + stringConversion(s) + "(value)); }");
     } else if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
-      lines.add("    @Override public void bool(String key, boolean value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bool(String key, boolean value) { map.put(" + key
           + ", value); }");
     } else {
-      lines.add("    @Override public void integer(String key, long value) { map.put(" + key
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void integer(String key, long value) { map.put(" + key
           + ", " + integerNarrowing(s) + "); }");
-      lines.add("    @Override public void bigInteger(String key, java.math.BigInteger value) { map.put("
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bigInteger(String key, java.math.BigInteger value) { map.put("
           + key + ", " + bigIntegerNarrowing(s) + "); }");
-      lines.add("    @Override public void decimal(String key, java.math.BigDecimal value) { map.put("
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void decimal(String key, java.math.BigDecimal value) { map.put("
           + key + ", " + decimalNarrowing(s) + "); }");
     }
     return String.join("\n", lines);
@@ -391,19 +393,19 @@ public final class JSONProcessor extends AbstractProcessor {
         + et + "]\")";
     List<String> lines = new ArrayList<>();
     if (!producedCallbacks.contains("string")) {
-      lines.add("    @Override public void string(String value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("integer")) {
-      lines.add("    @Override public void integer(long value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void integer(long value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bigInteger")) {
-      lines.add("    @Override public void bigInteger(java.math.BigInteger value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bigInteger(java.math.BigInteger value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("decimal")) {
-      lines.add("    @Override public void decimal(java.math.BigDecimal value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void decimal(java.math.BigDecimal value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bool")) {
-      lines.add("    @Override public void bool(boolean value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bool(boolean value) { " + msg + "; }");
     }
     return String.join("\n", lines);
   }
@@ -419,21 +421,21 @@ public final class JSONProcessor extends AbstractProcessor {
         + vt + "]\")";
     List<String> lines = new ArrayList<>();
     if (!producedCallbacks.contains("string")) {
-      lines.add("    @Override public void string(String key, String value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void string(String key, String value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("integer")) {
-      lines.add("    @Override public void integer(String key, long value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void integer(String key, long value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bigInteger")) {
-      lines.add("    @Override public void bigInteger(String key, java.math.BigInteger value) { "
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bigInteger(String key, java.math.BigInteger value) { "
           + msg + "; }");
     }
     if (!producedCallbacks.contains("decimal")) {
-      lines.add("    @Override public void decimal(String key, java.math.BigDecimal value) { "
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void decimal(String key, java.math.BigDecimal value) { "
           + msg + "; }");
     }
     if (!producedCallbacks.contains("bool")) {
-      lines.add("    @Override public void bool(String key, boolean value) { " + msg + "; }");
+      lines.add(OBSERVER_BODY_INDENT + "@Override public void bool(String key, boolean value) { " + msg + "; }");
     }
     return String.join("\n", lines);
   }
