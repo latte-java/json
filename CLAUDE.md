@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation
+
+- `docs/design/` — all design documents and specs (filenames prefixed with `YYYY-MM-DD-` creation date)
+- `docs/implementation/` — all implementation plans (filenames prefixed with `YYYY-MM-DD-` creation date)
+
 ## Build system
 
 Built with **Latte** (`project.latte`), not Maven/Gradle. Targets are invoked via the `latte` CLI from the repo root:
