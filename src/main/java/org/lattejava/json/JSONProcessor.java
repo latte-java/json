@@ -161,6 +161,10 @@ public final class JSONProcessor extends AbstractProcessor {
     String builderCallLines = Template.join(comps,
         c -> "." + builderCall(c, "value." + c.getSimpleName() + "()"), "\n");
 
+    String body = (structural.toString() + observers.toString()).lines()
+        .map(line -> line.startsWith("  ") ? line.substring(2) : line)
+        .collect(Collectors.joining("\n"))
+        .strip();
     String source = Template.of(Templates.COMPANION).render(Map.ofEntries(
         Map.entry("package", companionPkg),
         Map.entry("qualifiedType", qualifiedType),
@@ -171,7 +175,7 @@ public final class JSONProcessor extends AbstractProcessor {
         Map.entry("fields", fieldLines),
         Map.entry("omitNulls", String.valueOf(omitNulls)),
         Map.entry("builderCalls", builderCallLines),
-        Map.entry("body", (structural.toString() + observers.toString()).strip())));
+        Map.entry("body", body)));
 
     try {
       var file = processingEnv.getFiler().createSourceFile(companionPkg + "." + companion, record);
