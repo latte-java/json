@@ -116,4 +116,11 @@ public class TemplateTest {
         s -> s.equals("b") ? null : "[" + s + "]", "\n");
     assertEquals(out, "[a]\n[c]");
   }
+
+  @Test
+  public void joinSkipsLeadingAndTrailingNulls() {
+    String out = Template.join(Arrays.asList(null, "a", null, "b", null),
+        s -> s == null ? null : s, "\n");
+    assertEquals(out, "a\nb");
+  }
 }

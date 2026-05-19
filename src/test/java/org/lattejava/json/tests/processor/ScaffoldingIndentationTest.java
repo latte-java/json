@@ -42,4 +42,23 @@ public class ScaffoldingIndentationTest {
     assertFalse(src.contains("\n    @Override public void string(String key, String value) {\n"),
         "string(...) observer is over-indented (4 spaces); companion was:\n" + src);
   }
+
+  @Test
+  public void collectionObserverClassesAreCorrectlyIndented() throws Exception {
+    var result = ProcessorHarness.compile("collections");
+    assertTrue(result.success(), "collections fixture must compile: " + result.diagnostics());
+    Path companion;
+    try (var walk = Files.walk(result.outputDir())) {
+      companion = walk.filter(p -> p.getFileName().toString().endsWith("JSON.java"))
+                      .filter(p -> !p.getFileName().toString().equals("JSONProcessor.java"))
+                      .findFirst().orElseThrow(() -> new AssertionError("no companion"));
+    }
+    String src = Files.readString(companion, StandardCharsets.UTF_8);
+    assertTrue(src.contains("\n  private static final class "),
+        "inner observer class must be a 2-space member; was:\n" + src);
+    assertTrue(src.contains("\n  private static String "),
+        "collection serializer must be a 2-space member; was:\n" + src);
+    assertFalse(src.contains("\n    private static final class "),
+        "inner observer class must not be over-indented; was:\n" + src);
+  }
 }

@@ -11,6 +11,24 @@ package org.lattejava.json;
  * @author Brian Pontarelli
  */
 public final class Templates {
+  public static final String ARRAY_OBSERVER = """
+        private static String {{field}}ToJSON({{declType}} v) {
+          var b = new JSONArrayBuilder();
+          for (var e : v) b{{arrayAppend}};
+          return b.build();
+        }
+        private static final class {{obs}} implements JSONArrayObserver<{{declType}}> {
+          private final {{declType}} acc = new {{accImpl}}<>();
+      {{accumulator}}
+      {{stubs}}
+          @Override public {{declType}} finish() { return acc; }
+          @Override public JSONObjectHandler beginObject() { throw new JSONProcessingException("nested objects in collections unsupported"); }
+          @Override public JSONArrayObserver<?> beginArray() { throw new JSONProcessingException("nested collections unsupported"); }
+          @Override public void object(Object value) {}
+          @Override public void array(Object value) {}
+        }
+      """;
+
   public static final String COMPANION = """
       /*
        * Copyright (c) 2026 The Latte Project
@@ -65,6 +83,25 @@ public final class Templates {
 
         {{body}}
       }
+      """;
+
+  public static final String MAP_OBSERVER = """
+        private static String {{field}}ToJSON({{declType}} v) {
+          var b = new JSONBuilder({{omitNulls}});
+          for (var en : v.entrySet()) b.{{memberCall}};
+          return b.build();
+        }
+        private static final class {{obs}} implements JSONObserver<{{declType}}> {
+          private final {{declType}} map = new java.util.LinkedHashMap<>();
+      {{accumulator}}
+      {{stubs}}
+          @Override public void nullValue(String key) { map.put({{keyFromString}}, null); }
+          @Override public {{declType}} finish() { return map; }
+          @Override public JSONObjectHandler beginObject(String key) { throw new JSONProcessingException("nested objects in collections unsupported"); }
+          @Override public JSONArrayObserver<?> beginArray(String key) { throw new JSONProcessingException("nested collections unsupported"); }
+          @Override public void object(String key, Object value) {}
+          @Override public void array(String key, Object value) {}
+        }
       """;
 
   public static final String OBSERVER_BODY = """

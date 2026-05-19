@@ -124,28 +124,15 @@ public final class JSONProcessor extends AbstractProcessor {
         continue;
       }
       TypeMirror elem = typeArg(c.asType(), 0);
-      structural.append("  private static String ").append(c.getSimpleName()).append("ToJSON(")
-        .append(dt).append(" v) {\n");
-      structural.append("    var b = new JSONArrayBuilder();\n");
-      structural.append("    for (var e : v) b").append(arrayAppend(elem, "e")).append(";\n");
-      structural.append("    return b.build();\n");
-      structural.append("  }\n");
       String obs = cap(c.getSimpleName().toString()) + "ArrayObserver";
-      structural.append("  private static final class ").append(obs)
-        .append(" implements JSONArrayObserver<").append(dt).append("> {\n");
-      structural.append("    private final ").append(dt).append(" acc = new ")
-        .append(ck.equals("Set") ? "java.util.LinkedHashSet" : "java.util.ArrayList")
-        .append("<>();\n");
-      appendElementAccumulator(structural, elem, "acc");
-      appendUnusedArrayObserverStubs(structural, producedElementCallbacks(elem), elem);
-      structural.append("    @Override public ").append(dt).append(" finish() { return acc; }\n");
-      structural.append("    @Override public JSONObjectHandler beginObject() { "
-          + "throw new JSONProcessingException(\"nested objects in collections unsupported\"); }\n");
-      structural.append("    @Override public JSONArrayObserver<?> beginArray() { "
-          + "throw new JSONProcessingException(\"nested collections unsupported\"); }\n");
-      structural.append("    @Override public void object(Object value) {}\n");
-      structural.append("    @Override public void array(Object value) {}\n");
-      structural.append("  }\n");
+      structural.append(Template.of(Templates.ARRAY_OBSERVER).render(Map.ofEntries(
+          Map.entry("field", c.getSimpleName().toString()),
+          Map.entry("declType", dt),
+          Map.entry("arrayAppend", arrayAppend(elem, "e")),
+          Map.entry("obs", obs),
+          Map.entry("accImpl", ck.equals("Set") ? "java.util.LinkedHashSet" : "java.util.ArrayList"),
+          Map.entry("accumulator", elementAccumulator(elem, "acc")),
+          Map.entry("stubs", unusedArrayObserverStubs(producedElementCallbacks(elem), elem)))));
     }
     StringBuilder observers = new StringBuilder();
     appendObserverMethods(observers, record, comps);
@@ -161,6 +148,12 @@ public final class JSONProcessor extends AbstractProcessor {
     String builderCallLines = Template.join(comps,
         c -> "." + builderCall(c, "value." + c.getSimpleName() + "()"), "\n");
 
+    // Net-zero indentation contract: the structural and observers fragments are emitted at the
+    // legacy absolute indentation a class member sits at (members 2sp, bodies 4sp, switch/case arms
+    // 6sp). This dedent removes the leading 2sp, then the standalone {{body}} hole in COMPANION
+    // re-adds 2sp (net zero) so members land back at 2sp inside the companion class. Because of
+    // this, template {{...}} content holes (accumulator/stubs/cases) are authored at column 0 so
+    // the standalone-hole reindent passes their already-indented fragment lines through verbatim.
     String body = (structural.toString() + observers.toString()).lines()
         .map(line -> line.startsWith("  ") ? line.substring(2) : line)
         .collect(Collectors.joining("\n"))
@@ -209,30 +202,32 @@ public final class JSONProcessor extends AbstractProcessor {
    * pair with {@link #producedElementCallbacks}: their type-dispatch predicates MUST stay parallel (a callback emitted
    * here must be reported there, and vice versa). Tasks 3/4 inherit this.
    */
-  private void appendElementAccumulator(StringBuilder sb, TypeMirror t, String target) {
+  private String elementAccumulator(TypeMirror t, String target) {
     String s = t.toString();
+    List<String> lines = new ArrayList<>();
     if (isEnum(t)) {
-      sb.append("    @Override public void string(String value) { ").append(target)
-        .append(".add(Conversions.toEnum(").append(lastSegment(s)).append(".class, value)); }\n");
+      lines.add("    @Override public void string(String value) { " + target
+          + ".add(Conversions.toEnum(" + lastSegment(s) + ".class, value)); }");
     } else if (s.equals("java.lang.String")) {
-      sb.append("    @Override public void string(String value) { ").append(target).append(".add(value); }\n");
+      lines.add("    @Override public void string(String value) { " + target + ".add(value); }");
     } else if (s.equals("java.util.UUID")) {
-      sb.append("    @Override public void string(String value) { ").append(target)
-        .append(".add(Conversions.toUUID(value)); }\n");
+      lines.add("    @Override public void string(String value) { " + target
+          + ".add(Conversions.toUUID(value)); }");
     } else if (stringConversion(s) != null) {
-      sb.append("    @Override public void string(String value) { ").append(target)
-        .append(".add(Conversions.").append(stringConversion(s)).append("(value)); }\n");
+      lines.add("    @Override public void string(String value) { " + target
+          + ".add(Conversions." + stringConversion(s) + "(value)); }");
     } else if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
-      sb.append("    @Override public void bool(boolean value) { ").append(target).append(".add(value); }\n");
+      lines.add("    @Override public void bool(boolean value) { " + target + ".add(value); }");
     } else {
-      sb.append("    @Override public void integer(long value) { ").append(target).append(".add(")
-        .append(integerNarrowing(s)).append("); }\n");
-      sb.append("    @Override public void bigInteger(java.math.BigInteger value) { ").append(target)
-        .append(".add(").append(bigIntegerNarrowing(s)).append("); }\n");
-      sb.append("    @Override public void decimal(java.math.BigDecimal value) { ").append(target)
-        .append(".add(").append(decimalNarrowing(s)).append("); }\n");
+      lines.add("    @Override public void integer(long value) { " + target + ".add("
+          + integerNarrowing(s) + "); }");
+      lines.add("    @Override public void bigInteger(java.math.BigInteger value) { " + target
+          + ".add(" + bigIntegerNarrowing(s) + "); }");
+      lines.add("    @Override public void decimal(java.math.BigDecimal value) { " + target
+          + ".add(" + decimalNarrowing(s) + "); }");
     }
-    sb.append("    @Override public void nullValue() { ").append(target).append(".add(null); }\n");
+    lines.add("    @Override public void nullValue() { " + target + ".add(null); }");
+    return String.join("\n", lines);
   }
 
   /**
@@ -245,64 +240,53 @@ public final class JSONProcessor extends AbstractProcessor {
                                 boolean omitNulls) {
     TypeMirror k = typeArg(c.asType(), 0);
     TypeMirror v = typeArg(c.asType(), 1);
-    sb.append("  private static String ").append(c.getSimpleName()).append("ToJSON(")
-      .append(dt).append(" v) {\n");
-    sb.append("    var b = new JSONBuilder(").append(omitNulls).append(");\n");
-    sb.append("    for (var en : v.entrySet()) b.")
-      .append(memberCall(v, keyToString(k, "en.getKey()"), "en.getValue()")).append(";\n");
-    sb.append("    return b.build();\n");
-    sb.append("  }\n");
     String obs = cap(c.getSimpleName().toString()) + "MapObserver";
-    sb.append("  private static final class ").append(obs)
-      .append(" implements JSONObserver<").append(dt).append("> {\n");
-    sb.append("    private final ").append(dt).append(" map = new java.util.LinkedHashMap<>();\n");
-    appendMapValueAccumulator(sb, k, v);
-    appendUnusedMapObserverStubs(sb, producedElementCallbacks(v), v);
-    sb.append("    @Override public void nullValue(String key) { map.put(")
-      .append(keyFromString(k, "key")).append(", null); }\n");
-    sb.append("    @Override public ").append(dt).append(" finish() { return map; }\n");
-    sb.append("    @Override public JSONObjectHandler beginObject(String key) { "
-        + "throw new JSONProcessingException(\"nested objects in collections unsupported\"); }\n");
-    sb.append("    @Override public JSONArrayObserver<?> beginArray(String key) { "
-        + "throw new JSONProcessingException(\"nested collections unsupported\"); }\n");
-    sb.append("    @Override public void object(String key, Object value) {}\n");
-    sb.append("    @Override public void array(String key, Object value) {}\n");
-    sb.append("  }\n");
+    sb.append(Template.of(Templates.MAP_OBSERVER).render(Map.ofEntries(
+        Map.entry("field", c.getSimpleName().toString()),
+        Map.entry("declType", dt),
+        Map.entry("omitNulls", String.valueOf(omitNulls)),
+        Map.entry("memberCall", memberCall(v, keyToString(k, "en.getKey()"), "en.getValue()")),
+        Map.entry("obs", obs),
+        Map.entry("accumulator", mapValueAccumulator(k, v)),
+        Map.entry("stubs", unusedMapObserverStubs(producedElementCallbacks(v), v)),
+        Map.entry("keyFromString", keyFromString(k, "key")))));
   }
 
   /**
    * Inner Map-observer body that accumulates each JSON object member into {@code map} for value type {@code v}, parsing
    * the member name back to a key of type {@code k} via {@link #keyFromString}. Invariant pair with
    * {@link #producedElementCallbacks}: their type-dispatch predicates MUST stay parallel (a value callback emitted here
-   * must be reported there, and vice versa), the same discipline {@link #appendElementAccumulator} follows for
+   * must be reported there, and vice versa), the same discipline {@link #elementAccumulator} follows for
    * List/Set.
    */
-  private void appendMapValueAccumulator(StringBuilder sb, TypeMirror k, TypeMirror v) {
+  private String mapValueAccumulator(TypeMirror k, TypeMirror v) {
     String key = keyFromString(k, "key");
     String s = v.toString();
+    List<String> lines = new ArrayList<>();
     if (isEnum(v)) {
-      sb.append("    @Override public void string(String key, String value) { map.put(").append(key)
-        .append(", Conversions.toEnum(").append(lastSegment(s)).append(".class, value)); }\n");
+      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+          + ", Conversions.toEnum(" + lastSegment(s) + ".class, value)); }");
     } else if (s.equals("java.lang.String")) {
-      sb.append("    @Override public void string(String key, String value) { map.put(").append(key)
-        .append(", value); }\n");
+      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+          + ", value); }");
     } else if (s.equals("java.util.UUID")) {
-      sb.append("    @Override public void string(String key, String value) { map.put(").append(key)
-        .append(", Conversions.toUUID(value)); }\n");
+      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+          + ", Conversions.toUUID(value)); }");
     } else if (stringConversion(s) != null) {
-      sb.append("    @Override public void string(String key, String value) { map.put(").append(key)
-        .append(", Conversions.").append(stringConversion(s)).append("(value)); }\n");
+      lines.add("    @Override public void string(String key, String value) { map.put(" + key
+          + ", Conversions." + stringConversion(s) + "(value)); }");
     } else if (s.equals("boolean") || s.equals("java.lang.Boolean")) {
-      sb.append("    @Override public void bool(String key, boolean value) { map.put(").append(key)
-        .append(", value); }\n");
+      lines.add("    @Override public void bool(String key, boolean value) { map.put(" + key
+          + ", value); }");
     } else {
-      sb.append("    @Override public void integer(String key, long value) { map.put(").append(key)
-        .append(", ").append(integerNarrowing(s)).append("); }\n");
-      sb.append("    @Override public void bigInteger(String key, java.math.BigInteger value) { map.put(")
-        .append(key).append(", ").append(bigIntegerNarrowing(s)).append("); }\n");
-      sb.append("    @Override public void decimal(String key, java.math.BigDecimal value) { map.put(")
-        .append(key).append(", ").append(decimalNarrowing(s)).append("); }\n");
+      lines.add("    @Override public void integer(String key, long value) { map.put(" + key
+          + ", " + integerNarrowing(s) + "); }");
+      lines.add("    @Override public void bigInteger(String key, java.math.BigInteger value) { map.put("
+          + key + ", " + bigIntegerNarrowing(s) + "); }");
+      lines.add("    @Override public void decimal(String key, java.math.BigDecimal value) { map.put("
+          + key + ", " + decimalNarrowing(s) + "); }");
     }
+    return String.join("\n", lines);
   }
 
   private void appendObserverMethods(StringBuilder sb, TypeElement record,
@@ -398,60 +382,60 @@ public final class JSONProcessor extends AbstractProcessor {
   }
 
   /**
-   * Emits throwing stubs for every scalar element callback that {@link #appendElementAccumulator} did not produce, so
+   * Emits throwing stubs for every scalar element callback that {@link #elementAccumulator} did not produce, so
    * the generated inner observer is a concrete class.
    */
-  private void appendUnusedArrayObserverStubs(StringBuilder sb, Set<String> producedCallbacks,
-                                              TypeMirror elementType) {
+  private String unusedArrayObserverStubs(Set<String> producedCallbacks, TypeMirror elementType) {
     String et = elementType.toString();
     String msg = "throw new JSONProcessingException(\"unexpected JSON value for element type ["
         + et + "]\")";
+    List<String> lines = new ArrayList<>();
     if (!producedCallbacks.contains("string")) {
-      sb.append("    @Override public void string(String value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void string(String value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("integer")) {
-      sb.append("    @Override public void integer(long value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void integer(long value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bigInteger")) {
-      sb.append("    @Override public void bigInteger(java.math.BigInteger value) { ")
-        .append(msg).append("; }\n");
+      lines.add("    @Override public void bigInteger(java.math.BigInteger value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("decimal")) {
-      sb.append("    @Override public void decimal(java.math.BigDecimal value) { ")
-        .append(msg).append("; }\n");
+      lines.add("    @Override public void decimal(java.math.BigDecimal value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bool")) {
-      sb.append("    @Override public void bool(boolean value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void bool(boolean value) { " + msg + "; }");
     }
+    return String.join("\n", lines);
   }
 
   /**
-   * Emits throwing stubs for every member-keyed value callback that {@link #appendMapValueAccumulator} did not produce,
-   * so the generated inner Map observer is a concrete class. Mirrors {@link #appendUnusedArrayObserverStubs} for the
+   * Emits throwing stubs for every member-keyed value callback that {@link #mapValueAccumulator} did not produce,
+   * so the generated inner Map observer is a concrete class. Mirrors {@link #unusedArrayObserverStubs} for the
    * {@code (String key, value)} JSONObserver shape.
    */
-  private void appendUnusedMapObserverStubs(StringBuilder sb, Set<String> producedCallbacks,
-                                            TypeMirror valueType) {
+  private String unusedMapObserverStubs(Set<String> producedCallbacks, TypeMirror valueType) {
     String vt = valueType.toString();
     String msg = "throw new JSONProcessingException(\"unexpected JSON value for Map value type ["
         + vt + "]\")";
+    List<String> lines = new ArrayList<>();
     if (!producedCallbacks.contains("string")) {
-      sb.append("    @Override public void string(String key, String value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void string(String key, String value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("integer")) {
-      sb.append("    @Override public void integer(String key, long value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void integer(String key, long value) { " + msg + "; }");
     }
     if (!producedCallbacks.contains("bigInteger")) {
-      sb.append("    @Override public void bigInteger(String key, java.math.BigInteger value) { ")
-        .append(msg).append("; }\n");
+      lines.add("    @Override public void bigInteger(String key, java.math.BigInteger value) { "
+          + msg + "; }");
     }
     if (!producedCallbacks.contains("decimal")) {
-      sb.append("    @Override public void decimal(String key, java.math.BigDecimal value) { ")
-        .append(msg).append("; }\n");
+      lines.add("    @Override public void decimal(String key, java.math.BigDecimal value) { "
+          + msg + "; }");
     }
     if (!producedCallbacks.contains("bool")) {
-      sb.append("    @Override public void bool(String key, boolean value) { ").append(msg).append("; }\n");
+      lines.add("    @Override public void bool(String key, boolean value) { " + msg + "; }");
     }
+    return String.join("\n", lines);
   }
 
   /**
@@ -730,8 +714,8 @@ public final class JSONProcessor extends AbstractProcessor {
   }
 
   /**
-   * The scalar element callbacks {@link #appendElementAccumulator} emits for element type {@code t} ({@code nullValue}
-   * is always produced and therefore not listed here). Invariant pair with {@link #appendElementAccumulator}: their
+   * The scalar element callbacks {@link #elementAccumulator} emits for element type {@code t} ({@code nullValue}
+   * is always produced and therefore not listed here). Invariant pair with {@link #elementAccumulator}: their
    * type-dispatch predicates MUST stay parallel. Tasks 3/4 inherit this.
    */
   private Set<String> producedElementCallbacks(TypeMirror t) {
