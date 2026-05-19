@@ -65,4 +65,48 @@ public class TemplateTest {
     String out = Template.of(body).render(Map.of("fields", ""));
     assertEquals(out, "class Foo {\n}\n");
   }
+
+  @Test
+  public void injectedValueIsInert_notRescannedForOtherTokens() {
+    String out = Template.of("{{a}} {{b}}").render(new LinkedHashMap<>() {{
+      put("a", "X{{b}}Y");
+      put("b", "Z");
+    }});
+    assertEquals(out, "X{{b}}Y Z");
+  }
+
+  @Test
+  public void literalBracesInValueArePreserved() {
+    String out = Template.of("s = {{v}};").render(Map.of("v", "\"{{x}}\""));
+    assertEquals(out, "s = \"{{x}}\";");
+  }
+
+  @Test
+  public void standaloneHoleAtStartOfFile() {
+    String out = Template.of("{{x}}\n").render(Map.of("x", "a\nb"));
+    assertEquals(out, "a\nb\n");
+  }
+
+  @Test
+  public void inlineHoleAtEndOfFileNoTrailingNewline() {
+    String out = Template.of("x={{v}}").render(Map.of("v", "1"));
+    assertEquals(out, "x=1");
+  }
+
+  @Test
+  public void tabIndentReindentsWithTab() {
+    String out = Template.of("c {\n\t{{m}}\n}").render(Map.of("m", "a();\nb();"));
+    assertEquals(out, "c {\n\ta();\n\tb();\n}");
+  }
+
+  @Test
+  public void inlineHoleSharingLineIsNotStandalone() {
+    String out = Template.of("  pre {{h}} post").render(Map.of("h", "A\nB"));
+    assertEquals(out, "  pre A\nB post");
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void unterminatedHoleThrows() {
+    Template.of("a {{b").render(Map.of("b", "x"));
+  }
 }

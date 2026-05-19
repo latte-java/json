@@ -42,52 +42,49 @@ public final class Template {
   }
 
   /**
-   * Substitutes every {@code {{name}}} with its bound value. A hole whose line contains only whitespace around the
-   * {@code {{name}}} is a standalone hole: a multi-line value is re-indented to the hole's column, and an empty value
-   * drops the entire line. Any {@code {{name}}} left after substitution is a hard error.
+   * Substitutes every {@code {{name}}} in the template body with its bound value in a single left-to-right pass.
+   * Injected values are never re-scanned, so a value may freely contain {@code {{...}}} text. A hole whose line
+   * contains only whitespace around the {@code {{name}}} is a standalone hole: a multi-line value is re-indented to
+   * the hole's column and an empty value drops the entire line. An unknown or unterminated {@code {{name}}} in the
+   * body is a hard error. Precondition: fragment values carry no trailing newline (the standalone-hole contract);
+   * {@link #join} never produces one.
    */
   public String render(Map<String, String> bindings) {
-    String result = body;
-    for (Map.Entry<String, String> e : bindings.entrySet()) {
-      String token = "{{" + e.getKey() + "}}";
-      result = applyBinding(result, token, e.getValue());
-    }
-    int open = result.indexOf("{{");
-    if (open >= 0) {
-      int close = result.indexOf("}}", open);
-      String name = close > open ? result.substring(open + 2, close) : result.substring(open + 2);
-      throw new IllegalStateException("Unbound template hole [" + name + "]");
-    }
-    return result;
-  }
-
-  private String applyBinding(String text, String token, String value) {
     StringBuilder out = new StringBuilder();
     int pos = 0;
     while (true) {
-      int at = text.indexOf(token, pos);
+      int at = body.indexOf("{{", pos);
       if (at < 0) {
-        out.append(text, pos, text.length());
+        out.append(body, pos, body.length());
         return out.toString();
       }
-      int lineStart = text.lastIndexOf('\n', at) + 1;
-      int after = at + token.length();
+      int close = body.indexOf("}}", at + 2);
+      if (close < 0) {
+        throw new IllegalStateException(
+            "Unterminated template hole near [" + body.substring(at, lineEnd(body, at)) + "]");
+      }
+      String name = body.substring(at + 2, close);
+      if (!bindings.containsKey(name)) {
+        throw new IllegalStateException("Unbound template hole [" + name + "]");
+      }
+      String value = bindings.get(name);
+      int lineStart = body.lastIndexOf('\n', at) + 1;
+      int after = close + 2;
       boolean standalone =
-          text.substring(lineStart, at).isBlank()
-          && (after == text.length() || text.substring(after, lineEnd(text, after)).isBlank());
+          body.substring(lineStart, at).isBlank()
+          && (after == body.length() || body.substring(after, lineEnd(body, after)).isBlank());
       if (standalone) {
-        String indent = text.substring(lineStart, at);
-        out.append(text, pos, lineStart);
+        String indent = body.substring(lineStart, at);
+        out.append(body, pos, lineStart);
         if (value.isEmpty()) {
-          int nl = text.indexOf('\n', after);
-          pos = nl < 0 ? text.length() : nl + 1;
+          int nl = body.indexOf('\n', after);
+          pos = nl < 0 ? body.length() : nl + 1;
         } else {
           out.append(indent).append(reindent(value, indent));
-          int lineEnd = lineEnd(text, after);
-          pos = lineEnd;
+          pos = lineEnd(body, after);
         }
       } else {
-        out.append(text, pos, at).append(value);
+        out.append(body, pos, at).append(value);
         pos = after;
       }
     }
