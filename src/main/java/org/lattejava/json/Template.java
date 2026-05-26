@@ -63,15 +63,18 @@ public final class Template {
         out.append(body, pos, body.length());
         return out.toString();
       }
+
       int close = body.indexOf("}}", at + 2);
       if (close < 0) {
         throw new IllegalStateException(
             "Unterminated template hole near [" + body.substring(at, lineEnd(body, at)) + "]");
       }
+
       String name = body.substring(at + 2, close);
       if (!bindings.containsKey(name)) {
         throw new IllegalStateException("Unbound template hole [" + name + "]");
       }
+
       String value = bindings.get(name);
       int lineStart = body.lastIndexOf('\n', at) + 1;
       int after = close + 2;

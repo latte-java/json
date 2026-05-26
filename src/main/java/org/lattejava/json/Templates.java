@@ -19,8 +19,8 @@ public final class Templates {
         }
         private static final class {{obs}} implements JSONArrayObserver<{{declType}}> {
           private final {{declType}} acc = new {{accImpl}}<>();
-      {{accumulator}}
-      {{stubs}}
+          {{accumulator}}
+          {{stubs}}
           @Override public {{declType}} finish() { return acc; }
           @Override public JSONObjectHandler beginObject() { throw new JSONProcessingException("nested objects in collections unsupported"); }
           @Override public JSONArrayObserver<?> beginArray() { throw new JSONProcessingException("nested collections unsupported"); }
@@ -93,8 +93,8 @@ public final class Templates {
         }
         private static final class {{obs}} implements JSONObserver<{{declType}}> {
           private final {{declType}} map = new java.util.LinkedHashMap<>();
-      {{accumulator}}
-      {{stubs}}
+          {{accumulator}}
+          {{stubs}}
           @Override public void nullValue(String key) { map.put({{keyFromString}}, null); }
           @Override public {{declType}} finish() { return map; }
           @Override public JSONObjectHandler beginObject(String key) { throw new JSONProcessingException("nested objects in collections unsupported"); }

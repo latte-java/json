@@ -15,6 +15,9 @@ project(group: "org.lattejava", name: "json", version: "0.1.0", licenses: ["MIT"
   dependencies {
     group(name: "compile") {
     }
+    group(name: "annotation-processors") {
+      dependency(id: "org.lattejava.json:0.1.0")
+    }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:7.10.2")
     }
