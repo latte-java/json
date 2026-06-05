@@ -67,16 +67,16 @@ public final class JSONProcessor extends AbstractProcessor {
   void emitHelpers(ModuleElement module) {
     String pkg = module.getQualifiedName() + ".internal";
     for (String helper : HELPERS) {
-      String resource = "/org/lattejava/json/internal-templates/" + helper + ".java.txt";
+      String resource = "/org/lattejava/json/internal/" + helper + ".java";
       String body;
       try (InputStream in = JSONProcessor.class.getResourceAsStream(resource)) {
         if (in == null) {
-          processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Missing helper template resource [" + resource + "]");
+          processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Missing helper source resource [" + resource + "]");
           return;
         }
         body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
       } catch (IOException ioe) {
-        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Failed reading helper template [" + resource + "]: " + ioe.getMessage());
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Failed reading helper source [" + resource + "]: " + ioe.getMessage());
         return;
       }
 
@@ -123,15 +123,21 @@ public final class JSONProcessor extends AbstractProcessor {
       }
 
       TypeMirror elem = typeArg(c.asType(), 0);
-      String obs = cap(c.getSimpleName().toString()) + "ArrayObserver";
-      structural.append(Template.of(Templates.ARRAY_OBSERVER).render(Map.ofEntries(
-          Map.entry("field", c.getSimpleName().toString()),
-          Map.entry("declType", dt),
-          Map.entry("arrayAppend", arrayAppend(elem, "e")),
-          Map.entry("obs", obs),
-          Map.entry("accImpl", ck.equals("Set") ? "java.util.LinkedHashSet" : "java.util.ArrayList"),
-          Map.entry("accumulator", elementAccumulator(elem, "acc")),
-          Map.entry("stubs", unusedArrayObserverStubs(producedElementCallbacks(elem), elem)))));
+      String obs = capitalize(c.getSimpleName().toString()) + "ArrayObserver";
+      structural.append(
+          Template.of(Templates.ARRAY_OBSERVER)
+                  .render(
+                      Map.ofEntries(
+                          Map.entry("field", c.getSimpleName().toString()),
+                          Map.entry("declType", dt),
+                          Map.entry("arrayAppend", arrayAppend(elem, "e")),
+                          Map.entry("obs", obs),
+                          Map.entry("accImpl", ck.equals("Set") ? "java.util.LinkedHashSet" : "java.util.ArrayList"),
+                          Map.entry("accumulator", elementAccumulator(elem, "acc")),
+                          Map.entry("stubs", unusedArrayObserverStubs(producedElementCallbacks(elem), elem))
+                      )
+                  )
+      );
     }
 
     StringBuilder observers = new StringBuilder();
@@ -156,17 +162,21 @@ public final class JSONProcessor extends AbstractProcessor {
                                                      .map(line -> line.startsWith("  ") ? line.substring(2) : line)
                                                      .collect(Collectors.joining("\n"))
                                                      .strip();
-    String source = Template.of(Templates.COMPANION).render(Map.ofEntries(
-        Map.entry("package", companionPkg),
-        Map.entry("qualifiedType", qualifiedType),
-        Map.entry("internalPkg", internalPkg),
-        Map.entry("enumImports", enumImportLines),
-        Map.entry("companion", companion),
-        Map.entry("simpleName", simpleName),
-        Map.entry("fields", fieldLines),
-        Map.entry("omitNulls", String.valueOf(omitNulls)),
-        Map.entry("builderCalls", builderCallLines),
-        Map.entry("body", body)));
+    String source = Template.of(Templates.COMPANION)
+                            .render(
+                                Map.ofEntries(
+                                    Map.entry("package", companionPkg),
+                                    Map.entry("qualifiedType", qualifiedType),
+                                    Map.entry("internalPkg", internalPkg),
+                                    Map.entry("enumImports", enumImportLines),
+                                    Map.entry("companion", companion),
+                                    Map.entry("simpleName", simpleName),
+                                    Map.entry("fields", fieldLines),
+                                    Map.entry("omitNulls", String.valueOf(omitNulls)),
+                                    Map.entry("builderCalls", builderCallLines),
+                                    Map.entry("body", body)
+                                )
+                            );
 
     try {
       var file = processingEnv.getFiler().createSourceFile(companionPkg + "." + companion, record);
@@ -188,18 +198,25 @@ public final class JSONProcessor extends AbstractProcessor {
    */
   private void appendMapCodegen(StringBuilder sb, RecordComponentElement c, String dt,
                                 boolean omitNulls) {
-    TypeMirror k = typeArg(c.asType(), 0);
-    TypeMirror v = typeArg(c.asType(), 1);
-    String obs = cap(c.getSimpleName().toString()) + "MapObserver";
-    sb.append(Template.of(Templates.MAP_OBSERVER).render(Map.ofEntries(
-        Map.entry("field", c.getSimpleName().toString()),
-        Map.entry("declType", dt),
-        Map.entry("omitNulls", String.valueOf(omitNulls)),
-        Map.entry("memberCall", memberCall(v, keyToString(k, "en.getKey()"), "en.getValue()")),
-        Map.entry("obs", obs),
-        Map.entry("accumulator", mapValueAccumulator(k, v)),
-        Map.entry("stubs", unusedMapObserverStubs(producedElementCallbacks(v), v)),
-        Map.entry("keyFromString", keyFromString(k, "key")))));
+    TypeMirror keyGenericType = typeArg(c.asType(), 0);
+    TypeMirror valueGenericType = typeArg(c.asType(), 1);
+    String fieldName = c.getSimpleName().toString();
+    String observerName = capitalize(fieldName) + "MapObserver";
+    sb.append(
+        Template.of(Templates.MAP_OBSERVER)
+                .render(
+                    Map.ofEntries(
+                        Map.entry("field", fieldName),
+                        Map.entry("declType", dt),
+                        Map.entry("omitNulls", String.valueOf(omitNulls)),
+                        Map.entry("memberCall", memberCall(valueGenericType, keyToString(keyGenericType, "en.getKey()"), "en.getValue()")),
+                        Map.entry("obs", observerName),
+                        Map.entry("accumulator", mapValueAccumulator(keyGenericType, valueGenericType)),
+                        Map.entry("stubs", unusedMapObserverStubs(producedElementCallbacks(valueGenericType), valueGenericType)),
+                        Map.entry("keyFromString", keyFromString(keyGenericType, "key"))
+                    )
+                )
+    );
   }
 
   private void appendObserverMethods(StringBuilder sb, TypeElement record,
@@ -208,19 +225,19 @@ public final class JSONProcessor extends AbstractProcessor {
     String simpleName = record.getSimpleName().toString();
 
     String defaultArm = strict
-        ? "      default -> throw new JSONProcessingException(\"Unknown JSON key [\" + key + \"] for type ["
+        ? "default -> throw new JSONProcessingException(\"Unknown JSON key [\" + key + \"] for type ["
           + simpleName + "]\");"
-        : "      default -> { /* lenient: ignore unknown key */ }";
+        : "default -> { /* lenient: ignore unknown key */ }";
 
     String stringCases = Template.join(comps, c -> {
       String tt = c.asType().toString();
       if (tt.equals("java.lang.String")) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
       } else if (isEnum(c.asType())) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
             + " = Conversions.toEnum(" + lastSegment(tt) + ".class, value);";
       } else if (stringConversion(tt) != null) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
             + " = Conversions." + stringConversion(tt) + "(value);";
       }
       return null;
@@ -229,30 +246,30 @@ public final class JSONProcessor extends AbstractProcessor {
     String boolCases = Template.join(comps, c -> {
       String t = c.asType().toString();
       if (t.equals("boolean") || t.equals("java.lang.Boolean")) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = value;";
       }
       return null;
     }, "\n");
 
     String nullCases = Template.join(comps, c -> {
       if (c.asType().getKind().isPrimitive()) {
-        return "      case \"" + c.getSimpleName() + "\" -> throw new JSONProcessingException("
+        return "case \"" + c.getSimpleName() + "\" -> throw new JSONProcessingException("
             + "\"null for primitive field [" + c.getSimpleName() + "]\");";
       }
-      return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = null;";
+      return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = null;";
     }, "\n");
 
     String beginObjectCases = Template.join(comps, c -> {
       if ("Map".equals(collectionKind(c.asType()))) {
-        return "      case \"" + c.getSimpleName() + "\" -> { return new "
-            + cap(c.getSimpleName().toString()) + "MapObserver(); }";
+        return "case \"" + c.getSimpleName() + "\" -> { return new "
+            + capitalize(c.getSimpleName().toString()) + "MapObserver(); }";
       }
       return null;
     }, "\n");
 
     String objectCases = Template.join(comps, c -> {
       if ("Map".equals(collectionKind(c.asType()))) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
             + " = (" + declType(c.asType()) + ") value;";
       }
       return null;
@@ -261,8 +278,8 @@ public final class JSONProcessor extends AbstractProcessor {
     String beginArrayCases = Template.join(comps, c -> {
       String ck = collectionKind(c.asType());
       if ("List".equals(ck) || "Set".equals(ck)) {
-        return "      case \"" + c.getSimpleName() + "\" -> { return new "
-            + cap(c.getSimpleName().toString()) + "ArrayObserver(); }";
+        return "case \"" + c.getSimpleName() + "\" -> { return new "
+            + capitalize(c.getSimpleName().toString()) + "ArrayObserver(); }";
       }
       return null;
     }, "\n");
@@ -270,7 +287,7 @@ public final class JSONProcessor extends AbstractProcessor {
     String arrayCases = Template.join(comps, c -> {
       String ck = collectionKind(c.asType());
       if ("List".equals(ck) || "Set".equals(ck)) {
-        return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
+        return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName()
             + " = (" + declType(c.asType()) + ") value;";
       }
       return null;
@@ -334,6 +351,10 @@ public final class JSONProcessor extends AbstractProcessor {
     String ck = collectionKind(c.asType());
     if (ck != null) {
       if ("List".equals(ck) || "Set".equals(ck)) {
+        var template = """
+            array("{{key}}", {{accessor}} == null ? null : {{name}}ToJSON({{accessor}}))
+            """;
+        Template.render(template, Map.of("key", key, "accessor", accessor, "name", c.getSimpleName()));
         return "array(\"" + key + "\", " + accessor + " == null ? null : "
             + c.getSimpleName() + "ToJSON(" + accessor + "))";
       }
@@ -349,7 +370,7 @@ public final class JSONProcessor extends AbstractProcessor {
   /**
    * Capitalizes the first character of {@code name} for use in a generated inner-class name.
    */
-  private String cap(String name) {
+  private String capitalize(String name) {
     return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
   }
 
@@ -419,8 +440,8 @@ public final class JSONProcessor extends AbstractProcessor {
 
   /**
    * Inner-observer body that accumulates the JSON value into {@code target} (a List/Set) for element type {@code t}.
-   * Renders the {@link #elementCallbacks} model; {@link #producedElementCallbacks} reports the same model, so the
-   * two can no longer drift. Tasks 3/4 inherit this.
+   * Renders the {@link #elementCallbacks} model; {@link #producedElementCallbacks} reports the same model, so the two
+   * can no longer drift. Tasks 3/4 inherit this.
    */
   private String elementAccumulator(TypeMirror t, String target) {
     return Template.join(elementCallbacks(t, target),
@@ -437,8 +458,7 @@ public final class JSONProcessor extends AbstractProcessor {
     String s = t.toString();
     List<Callback> cbs = new ArrayList<>();
     if (isEnum(t)) {
-      cbs.add(new Callback("string", "void string(String value)",
-          target + ".add(Conversions.toEnum(" + lastSegment(s) + ".class, value))"));
+      cbs.add(new Callback("string", Template.render("void string(String value)", target + ".add(Conversions.toEnum(" + lastSegment(s) + ".class, value))"));
     } else if (s.equals("java.lang.String")) {
       cbs.add(new Callback("string", "void string(String value)", target + ".add(value)"));
     } else if (s.equals("java.util.UUID")) {
@@ -619,20 +639,20 @@ public final class JSONProcessor extends AbstractProcessor {
     return switch (s) {
       case "java.lang.String" -> "string(" + keyExpr + ", " + valExpr + ")";
       case "boolean", "java.lang.Boolean" -> "bool(" + keyExpr + ", " + valExpr + ")";
-      case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long"
-          -> "integer(" + keyExpr + ", " + valExpr + ")";
+      case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" ->
+          "integer(" + keyExpr + ", " + valExpr + ")";
       case "float", "double" -> "decimal(" + keyExpr + ", java.math.BigDecimal.valueOf(" + valExpr + "))";
       case "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" -> "decimal(" + keyExpr + ", " + valExpr + ")";
       case "java.math.BigInteger" -> "bigInteger(" + keyExpr + ", " + valExpr + ")";
       case "java.util.UUID", "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
-           "java.time.OffsetDateTime", "java.time.ZonedDateTime", "java.time.Duration", "java.time.Period"
-          -> "string(" + keyExpr + ", " + valExpr + " == null ? null : " + valExpr + ".toString())";
+           "java.time.OffsetDateTime", "java.time.ZonedDateTime", "java.time.Duration", "java.time.Period" ->
+          "string(" + keyExpr + ", " + valExpr + " == null ? null : " + valExpr + ".toString())";
       default -> throw new IllegalStateException("unreachable: validated type [" + s + "]");
     };
   }
 
   /**
-   * Maps {@code comps} to {@code "      case \"name\" -> this.name = "} prefixed arms, skipping any component whose
+   * Maps {@code comps} to {@code "case \"name\" -> this.name = "} prefixed arms, skipping any component whose
    * {@code narrowing} function returns {@code null} (not applicable to this numeric callback).
    */
   private String narrowingCases(List<RecordComponentElement> comps,
@@ -642,7 +662,7 @@ public final class JSONProcessor extends AbstractProcessor {
       if (narrow == null) {
         return null;
       }
-      return "      case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = " + narrow + ";";
+      return "case \"" + c.getSimpleName() + "\" -> this." + c.getSimpleName() + " = " + narrow + ";";
     }, "\n");
   }
 
@@ -659,9 +679,9 @@ public final class JSONProcessor extends AbstractProcessor {
   }
 
   /**
-   * The scalar element callback slots {@link #elementAccumulator} emits for element type {@code t}, projected from
-   * the shared {@link #elementCallbacks} model ({@code nullValue} is always produced and is excluded here, since
-   * stubs never cover it). Tasks 3/4 inherit this.
+   * The scalar element callback slots {@link #elementAccumulator} emits for element type {@code t}, projected from the
+   * shared {@link #elementCallbacks} model ({@code nullValue} is always produced and is excluded here, since stubs
+   * never cover it). Tasks 3/4 inherit this.
    */
   private Set<String> producedElementCallbacks(TypeMirror t) {
     Set<String> kinds = new HashSet<>();
@@ -856,8 +876,8 @@ public final class JSONProcessor extends AbstractProcessor {
 
   /**
    * One scalar observer callback for a List/Set element type: its slot {@code kind} (e.g. {@code string},
-   * {@code integer}, or {@code nullValue}), the method {@code signature} the generated {@code @Override} declares,
-   * and the {@code body} expression that accumulates the value (no trailing {@code ;}).
+   * {@code integer}, or {@code nullValue}), the method {@code signature} the generated {@code @Override} declares, and
+   * the {@code body} expression that accumulates the value (no trailing {@code ;}).
    */
   private record Callback(String kind, String signature, String body) {
   }

@@ -107,64 +107,64 @@ public final class Templates {
   public static final String OBSERVER_BODY = """
         @Override public void string(String key, String value) {
           switch (key) {
-      {{stringCases}}
-      {{defaultArm}}
+            {{stringCases}}
+            {{defaultArm}}
           }
         }
         @Override public void integer(String key, long value) {
           switch (key) {
-      {{integerCases}}
-      {{defaultArm}}
+            {{integerCases}}
+            {{defaultArm}}
           }
         }
         @Override public void bigInteger(String key, BigInteger value) {
           switch (key) {
-      {{bigIntegerCases}}
-      {{defaultArm}}
+            {{bigIntegerCases}}
+            {{defaultArm}}
           }
         }
         @Override public void decimal(String key, BigDecimal value) {
           switch (key) {
-      {{decimalCases}}
-      {{defaultArm}}
+            {{decimalCases}}
+            {{defaultArm}}
           }
         }
         @Override public void bool(String key, boolean value) {
           switch (key) {
-      {{boolCases}}
-      {{defaultArm}}
+            {{boolCases}}
+            {{defaultArm}}
           }
         }
         @Override public void nullValue(String key) {
           switch (key) {
-      {{nullCases}}
-      {{defaultArm}}
+            {{nullCases}}
+            {{defaultArm}}
           }
         }
         @Override public JSONObjectHandler beginObject(String key) {
           switch (key) {
-      {{beginObjectCases}}
+            {{beginObjectCases}}
           }
           throw new IllegalStateException("nested objects unsupported in this release");
         }
         @SuppressWarnings("unchecked")
         @Override public void object(String key, Object value) {
           switch (key) {
-      {{objectCases}}
-      {{defaultArm}}
+            {{objectCases}}
+            {{defaultArm}}
           }
         }
         @Override public JSONArrayObserver<?> beginArray(String key) {
           switch (key) {
-      {{beginArrayCases}}
+            {{beginArrayCases}}
           }
           throw new IllegalStateException("arrays unsupported in this release");
         }
         @SuppressWarnings("unchecked")
         @Override public void array(String key, Object value) {
           switch (key) {
-      {{arrayCases}}
-      {{defaultArm}}
+            {{arrayCases}}
+            {{defaultArm}}
           }
         }
         @Override public {{simpleName}} finish() {

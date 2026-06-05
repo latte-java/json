@@ -8,6 +8,8 @@ import module java.base;
 
 /**
  * Per-field configuration for a record component or class field of an {@link JSON @JSON}-annotated type.
+ * <p>
+ * TODO: Not implemented yet.
  *
  * @author Brian Pontarelli
  */
