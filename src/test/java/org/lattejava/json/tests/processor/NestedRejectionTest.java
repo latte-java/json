@@ -27,4 +27,13 @@ public class NestedRejectionTest {
             d.contains("not @JSON-annotated") && d.contains("[ps]")),
         "expected a not-@JSON-annotated error for [ps], got: " + r.diagnostics());
   }
+
+  @Test
+  public void mapValueNonJSONRecordRejected() throws Exception {
+    var r = ProcessorHarness.compile("badnested");
+    assertFalse(r.success());
+    assertTrue(r.diagnostics().stream().anyMatch(d ->
+            d.contains("not @JSON-annotated") && d.contains("[m]")),
+        "expected a not-@JSON-annotated error for [m], got: " + r.diagnostics());
+  }
 }
