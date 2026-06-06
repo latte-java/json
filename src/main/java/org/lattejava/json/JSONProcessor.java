@@ -7,6 +7,7 @@ package org.lattejava.json;
 import org.lattejava.json.jte.Component;
 import org.lattejava.json.jte.CompanionView;
 import org.lattejava.json.jte.JTEEngine;
+import org.lattejava.json.jte.PolymorphicView;
 import org.lattejava.json.jte.TypeView;
 
 import module java.base;
@@ -45,15 +46,26 @@ public final class JSONProcessor extends AbstractProcessor {
 
     Set<? extends Element> annotated = roundEnv.getElementsAnnotatedWith(jsonAnno);
     for (Element e : annotated) {
-      if (e.getKind() != ElementKind.RECORD) {
-        error(e, "@JSON supports only records in this release; [" + qualified(e) + "] is a [" + e.getKind() + "]");
+      TypeElement type = (TypeElement) e;
+      boolean polyParent = e.getKind() == ElementKind.INTERFACE && type.getAnnotation(JSONTypeInfo.class) != null;
+      if (e.getKind() != ElementKind.RECORD && !polyParent) {
+        error(e, "@JSON supports only records and sealed @JSONTypeInfo interfaces in this release; ["
+            + qualified(e) + "] is a [" + e.getKind() + "]");
         continue;
       }
 
-      TypeElement type = (TypeElement) e;
       ModuleElement module = processingEnv.getElementUtils().getModuleOf(type);
       if (module == null || module.isUnnamed()) {
         error(e, "@JSON requires a named module (module-info.java); type [" + type.getQualifiedName() + "] is in the unnamed module");
+        continue;
+      }
+
+      if (polyParent) {
+        if (!helpersEmitted) {
+          emitHelpers(module);
+          helpersEmitted = true;
+        }
+        generatePolymorphic(type, module);
         continue;
       }
 
@@ -115,8 +127,21 @@ public final class JSONProcessor extends AbstractProcessor {
       collectEnums(new TypeView(processingEnv, c.asType()), enumImports);
     }
 
+    String discriminatorKey = "";
+    String discriminatorValue = "";
+    for (TypeMirror itf : record.getInterfaces()) {
+      TypeElement itfEl = (TypeElement) ((javax.lang.model.type.DeclaredType) itf).asElement();
+      JSONTypeInfo ti = itfEl.getAnnotation(JSONTypeInfo.class);
+      if (ti != null) {
+        discriminatorKey = ti.property();
+        discriminatorValue = discriminatorValueOf(record);
+        break;
+      }
+    }
+
     CompanionView view = new CompanionView(companionPkg, internalPkg, qualifiedType, simpleName, companion,
-        readOmitNulls(record), readStrict(record), List.copyOf(enumImports), components);
+        readOmitNulls(record), readStrict(record), List.copyOf(enumImports), components,
+        discriminatorKey, discriminatorValue);
     String source = JTEEngine.render("companion.jte", Map.of("view", view));
 
     try {
@@ -128,6 +153,42 @@ public final class JSONProcessor extends AbstractProcessor {
       processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
           "Failed writing companion [" + companionPkg + "." + companion + "]: " + ioe.getMessage(),
           record);
+    }
+  }
+
+  void generatePolymorphic(TypeElement iface, ModuleElement module) {
+    String internalPkg = module.getQualifiedName() + ".internal";
+    String typePkg = processingEnv.getElementUtils().getPackageOf(iface).getQualifiedName().toString();
+    String companionPkg = typePkg.isEmpty() ? "internal" : typePkg + ".internal";
+    String simpleName = iface.getSimpleName().toString();
+    String companion = simpleName + "JSON";
+    String qualifiedType = iface.getQualifiedName().toString();
+    String discriminatorKey = iface.getAnnotation(JSONTypeInfo.class).property();
+
+    List<PolymorphicView.Subtype> subtypes = new ArrayList<>();
+    for (TypeMirror permitted : iface.getPermittedSubclasses()) {
+      TypeElement sub = (TypeElement) ((javax.lang.model.type.DeclaredType) permitted).asElement();
+      String subPkg = processingEnv.getElementUtils().getPackageOf(sub).getQualifiedName().toString();
+      String subCompanionPkg = subPkg.isEmpty() ? "internal" : subPkg + ".internal";
+      subtypes.add(new PolymorphicView.Subtype(
+          discriminatorValueOf(sub),
+          sub.getQualifiedName().toString(),
+          subCompanionPkg + "." + sub.getSimpleName() + "JSON"));
+    }
+
+    PolymorphicView view = new PolymorphicView(companionPkg, internalPkg, qualifiedType, simpleName,
+        companion, discriminatorKey, subtypes);
+    String source = JTEEngine.render("polymorphic.jte", Map.of("view", view));
+
+    try {
+      var file = processingEnv.getFiler().createSourceFile(companionPkg + "." + companion, iface);
+      try (Writer w = file.openWriter()) {
+        w.write(source);
+      }
+    } catch (IOException ioe) {
+      processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+          "Failed writing companion [" + companionPkg + "." + companion + "]: " + ioe.getMessage(),
+          iface);
     }
   }
 
@@ -151,6 +212,12 @@ public final class JSONProcessor extends AbstractProcessor {
     if (type.isEnum()) {
       into.add(type.name());
     }
+  }
+
+  private String discriminatorValueOf(TypeElement subtype) {
+    JSONSubtype ann = subtype.getAnnotation(JSONSubtype.class);
+    String v = ann == null ? "" : ann.value();
+    return v.isEmpty() ? subtype.getSimpleName().toString() : v;
   }
 
   private void error(Element e, String message) {

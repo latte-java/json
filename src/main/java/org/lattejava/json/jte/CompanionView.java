@@ -18,6 +18,8 @@ public final class CompanionView {
   private final String companionName;
   private final String companionPackage;
   private final List<Component> components;
+  private final String discriminatorKey;
+  private final String discriminatorValue;
   private final List<String> enumImports;
   private final String internalPackage;
   private final boolean omitNulls;
@@ -27,7 +29,7 @@ public final class CompanionView {
 
   public CompanionView(String companionPackage, String internalPackage, String qualifiedType, String simpleName,
                        String companionName, boolean omitNulls, boolean strict, List<String> enumImports,
-                       List<Component> components) {
+                       List<Component> components, String discriminatorKey, String discriminatorValue) {
     this.companionPackage = companionPackage;
     this.internalPackage = internalPackage;
     this.qualifiedType = qualifiedType;
@@ -37,6 +39,8 @@ public final class CompanionView {
     this.strict = strict;
     this.enumImports = enumImports;
     this.components = components;
+    this.discriminatorKey = discriminatorKey;
+    this.discriminatorValue = discriminatorValue;
   }
 
   public List<Component> collectionComponents() {
@@ -53,6 +57,14 @@ public final class CompanionView {
 
   public List<Component> components() {
     return components;
+  }
+
+  public String discriminatorKey() {
+    return discriminatorKey;
+  }
+
+  public String discriminatorValue() {
+    return discriminatorValue;
   }
 
   public List<String> enumImports() {

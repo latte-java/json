@@ -42,6 +42,9 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 
   private static JSONBuilder builder(${view.simpleName()} value) {
     return new JSONBuilder(${view.omitNulls()})
+@if(!view.discriminatorKey().isEmpty())
+        .string("${view.discriminatorKey()}", "${view.discriminatorValue()}")
+@endif
 @for(Component c : view.components())
 @if(c.type().isList() || c.type().isSet())
         .array("${c.name()}", value.${c.name()}() == null ? null : ${c.name()}ToJSON(value.${c.name()}()))

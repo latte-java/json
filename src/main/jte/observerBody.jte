@@ -3,6 +3,9 @@
 @param CompanionView view
   @Override public void string(String key, String value) {
     switch (key) {
+@if(!view.discriminatorKey().isEmpty())
+      case "${view.discriminatorKey()}" -> { /* discriminator: ignore */ }
+@endif
 @for(Component c : view.components())
 @if(c.type().isStringForm())
       case "${c.name()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
