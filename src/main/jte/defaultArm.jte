@@ -1,0 +1,2 @@
+@param org.lattejava.json.jte.CompanionView view
+${view.strict() ? "default -> throw new JSONProcessingException(\"Unknown JSON key [\" + key + \"] for type [" + view.simpleName() + "]\");" : "default -> { /* lenient: ignore unknown key */ }"}

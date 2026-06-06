@@ -2,7 +2,7 @@
  * Copyright (c) 2025-2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
-project(group: "org.lattejava", name: "json", version: "0.1.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "json", version: "0.2.0", licenses: ["MIT"]) {
   workflow {
     standard()
   }
@@ -12,6 +12,10 @@ project(group: "org.lattejava", name: "json", version: "0.1.0", licenses: ["MIT"
   }
 
   dependencies {
+    group(name: "compile") {
+      dependency(id: "gg.jte:jte:3.2.1")
+      dependency(id: "gg.jte:jte-runtime:3.2.1")
+    }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:7.12.0")
     }
@@ -39,7 +43,18 @@ target(name: "clean", description: "Cleans the project") {
 }
 
 target(name: "build", description: "Compiles and JARs the project") {
-  java.compile()
+  java.compileMain()
+  // Precompile the JTE templates (src/main/jte/*.jte) into build/classes/main under
+  // org.lattejava.json.jte.generated, so the precompiled classes are baked into the jar. Runs the
+  // just-compiled Generate main off the exploded classes dir (the jar does not exist yet) plus the
+  // build-time jte compiler/runtime from the compile group.
+  java.run(
+      main: "org.lattejava.json.jte.Generate",
+      jvmArguments: "--add-modules gg.jte",
+      additionalClasspath: ["build/classes/main"],
+      dependencies: [[group: "compile", transitive: true, fetchSource: false, transitiveGroups: ["compile", "runtime"]]]
+  )
+  java.compileTest()
   file.copy(to: "build/classes/main/org/lattejava/json/internal") {
     fileSet(dir: "src/main/java/org/lattejava/json/",
         includePatterns: [/Any.*/, /Conversion.*/, /JSON.*/, /Numbers.*/, /Skip.*/],

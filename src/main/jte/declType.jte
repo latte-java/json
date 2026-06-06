@@ -1,0 +1,2 @@
+@param org.lattejava.json.jte.TypeView type
+${type.isMap() ? "Map<" + type.key().simpleName() + ", " + type.value().simpleName() + ">" : type.isCollection() ? type.kind() + "<" + type.element().simpleName() + ">" : type.simpleName()}
