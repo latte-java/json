@@ -69,13 +69,19 @@ Per-type companions live in a separate `<typePackage>.internal` sub-package (see
 
 Helpers are maintained as **ordinary Java source** in this library's source tree — they are compiled and tested as part of this library's own build. That guarantees the templates are valid Java, refactorable in any IDE, and exercisable through a normal test suite before they ever ship.
 
-For distribution, the canonical helper `.java` files are checked in as verbatim text-template resources under `src/main/resources/org/lattejava/json/internal-templates/<Name>.java.txt` (a drift-guard test asserts byte-equality with the compiled `src/main/java/org/lattejava/json/<Name>.java` sources so they cannot silently diverge). At codegen time, the annotation processor:
+For distribution, the canonical helper `.java` sources are copied verbatim at this library's build time into `build/classes/main/org/lattejava/json/internal/` (configured in `project.latte`), so they ride inside this library's jar as classpath resources under `/org/lattejava/json/internal/`. The emitted copies **are** the canonical sources, only relocated, so there is no separate template that can drift — the single source of truth is the helper `.java` file itself. The exact set of helpers copied and emitted is the `JSONProcessor.HELPERS` list. At codegen time, the annotation processor:
 
-1. Reads each helper resource as a string.
+1. Reads each helper from the classpath resource `/org/lattejava/json/internal/<Name>.java` as a string.
 2. Rewrites the leading `package` statement to point at `<moduleName>.internal`.
 3. Emits the file via `Filer.createSourceFile`.
 
-That is the **only** transformation applied — everything else in the helper source is copied verbatim. No string templating, no AST rewriting, no extra dependency (no JavaPoet). Helpers stay first-class Java; the only thing that varies per consumer is the package line.
+That is the **only** transformation applied to a helper — everything else in the helper source is copied verbatim. No string templating, no AST rewriting. Helpers stay first-class Java; the only thing that varies per consumer is the package line.
+
+### How the companion source is produced
+
+Unlike the helpers, each `*JSON` companion is **rendered** (not copied) from [JTE](https://jte.gg) templates under `src/main/jte/*.jte` (`companion.jte`, `observerBody.jte`, `arrayObserver.jte`, `mapObserver.jte`, and the small leaf fragments). The templates are precompiled into Java at this library's own build time (`org.lattejava.json.jte.Generate`, baked into the jar under `org.lattejava.json.jte.generated`); at codegen time `JTEEngine` renders the precompiled templates against a `CompanionView` model of the annotated type and emits the resulting Java source via `Filer.createSourceFile`.
+
+JTE (`gg.jte` / `gg.jte.runtime`) is therefore a **build-time-only dependency of the annotation processor** — it runs inside javac during the consumer's build to produce Java source text, and nothing from JTE is ever emitted into or referenced by the consumer's compiled output. The consumer's runtime still depends only on the verbatim-copied `<moduleName>.internal` helpers, preserving the "no runtime dependency on this library" guarantee. The processor's own module descriptor reflects this split: `requires static gg.jte` for the build-time precompiler and `requires gg.jte.runtime` for rendering the precompiled templates.
 
 ### Emission strategy per processor invocation
 
