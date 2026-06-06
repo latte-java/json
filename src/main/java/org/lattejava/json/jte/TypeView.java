@@ -34,8 +34,9 @@ public final class TypeView {
   }
 
   /**
-   * The reference form to write for this type in generated source: the fully-qualified name for a nested {@code @JSON}
-   * record (so no import is needed and same-simple-name collisions cannot occur), else the simple name.
+   * The reference form to write for this type in generated source: the fully-qualified name for a type with a
+   * generated companion (a nested {@code @JSON} record or a polymorphic {@code @JSON} interface), so no import is
+   * needed and same-simple-name collisions cannot occur, else the simple name.
    */
   public String decl() {
     return hasCompanion() ? name() : simpleName();
@@ -164,8 +165,9 @@ public final class TypeView {
   }
 
   /**
-   * The fully-qualified name of the generated companion for this nested type, e.g. {@code demo.internal.AddressJSON}.
-   * Only meaningful when {@link #isNested()} is true.
+   * The fully-qualified name of the generated companion for this type, e.g. {@code demo.internal.AddressJSON} (a nested
+   * record's object companion) or {@code demo.internal.PetJSON} (a polymorphic interface's dispatcher). Only meaningful
+   * when {@link #hasCompanion()} is true.
    */
   public String nestedCompanion() {
     Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
