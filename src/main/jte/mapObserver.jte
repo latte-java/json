@@ -12,7 +12,13 @@
   }
   private static final class @template.cap(name = c.name())MapObserver implements JSONObserver<@template.declType(type = c.type())> {
     private final @template.declType(type = c.type()) map = new java.util.LinkedHashMap<>();
-@if(valType.isStringForm())
+@if(valType.isNested())
+    @Override public void string(String key, String value) { ${stub} }
+    @Override public void integer(String key, long value) { ${stub} }
+    @Override public void bigInteger(String key, java.math.BigInteger value) { ${stub} }
+    @Override public void decimal(String key, java.math.BigDecimal value) { ${stub} }
+    @Override public void bool(String key, boolean value) { ${stub} }
+@elseif(valType.isStringForm())
     @Override public void string(String key, String value) { map.put(@template.fromString(type = keyType, expr = "key"), @template.fromString(type = valType, expr = "value")); }
     @Override public void integer(String key, long value) { ${stub} }
     @Override public void bigInteger(String key, java.math.BigInteger value) { ${stub} }
@@ -33,8 +39,15 @@
 @endif
     @Override public void nullValue(String key) { map.put(@template.fromString(type = keyType, expr = "key"), null); }
     @Override public @template.declType(type = c.type()) finish() { return map; }
+@if(valType.isNested())
+    @Override public JSONObjectHandler beginObject(String key) { return new ${valType.nestedCompanion()}(); }
+    @Override public JSONArrayObserver<?> beginArray(String key) { throw new JSONProcessingException("nested collections unsupported"); }
+    @Override public void object(String key, Object value) { map.put(@template.fromString(type = keyType, expr = "key"), (${valType.decl()}) value); }
+    @Override public void array(String key, Object value) {}
+@else
     @Override public JSONObjectHandler beginObject(String key) { throw new JSONProcessingException("nested objects in collections unsupported"); }
     @Override public JSONArrayObserver<?> beginArray(String key) { throw new JSONProcessingException("nested collections unsupported"); }
     @Override public void object(String key, Object value) {}
     @Override public void array(String key, Object value) {}
+@endif
   }

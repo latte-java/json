@@ -4,5 +4,5 @@ import module java.base;
 import module org.lattejava.json;
 
 @JSON
-public record JsonElement(List<Inner> items) {
+public record Tree(String name, List<Tree> kids) {
 }

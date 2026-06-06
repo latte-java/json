@@ -9,6 +9,8 @@ import module java.compiler;
 
 import javax.lang.model.type.TypeKind;
 
+import org.lattejava.json.JSON;
+
 /**
  * Template-facing facts about one declared type — the "type part" of companion generation. Exposes only what the JTE
  * templates cannot compute themselves: the things that require the processing environment ({@code Types}/{@code
@@ -28,6 +30,14 @@ public final class TypeView {
   public TypeView(ProcessingEnvironment processingEnv, TypeMirror type) {
     this.processingEnv = processingEnv;
     this.type = type;
+  }
+
+  /**
+   * The reference form to write for this type in generated source: the fully-qualified name for a nested {@code @JSON}
+   * record (so no import is needed and same-simple-name collisions cannot occur), else the simple name.
+   */
+  public String decl() {
+    return isNested() ? name() : simpleName();
   }
 
   public TypeView element() {
@@ -56,12 +66,33 @@ public final class TypeView {
     return kind().equals("Map");
   }
 
+  /**
+   * Whether this type is a record annotated with {@code @JSON} — a nested type the processor can recurse into. Note:
+   * {@code @JSON} is {@code SOURCE}-retained, so a record from a compiled dependency reports {@code false} here and is
+   * rejected as un-annotated, which is also the cross-module restriction.
+   */
+  public boolean isNested() {
+    if (type.getKind() != TypeKind.DECLARED) {
+      return false;
+    }
+    Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+    return element.getKind() == ElementKind.RECORD && element.getAnnotation(JSON.class) != null;
+  }
+
   public boolean isNumeric() {
     return NUMERIC.contains(name());
   }
 
   public boolean isPrimitive() {
     return type.getKind().isPrimitive();
+  }
+
+  /**
+   * Whether this type is a record (annotated or not) — used to give a precise "not @JSON-annotated" diagnostic.
+   */
+  public boolean isRecord() {
+    return type.getKind() == TypeKind.DECLARED
+        && ((javax.lang.model.type.DeclaredType) type).asElement().getKind() == ElementKind.RECORD;
   }
 
   public boolean isSet() {
@@ -105,6 +136,16 @@ public final class TypeView {
    */
   public String name() {
     return type.toString();
+  }
+
+  /**
+   * The fully-qualified name of the generated companion for this nested type, e.g. {@code demo.internal.AddressJSON}.
+   * Only meaningful when {@link #isNested()} is true.
+   */
+  public String nestedCompanion() {
+    Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+    String pkg = processingEnv.getElementUtils().getPackageOf(element).getQualifiedName().toString();
+    return (pkg.isEmpty() ? "internal" : pkg + ".internal") + "." + simpleName() + "JSON";
   }
 
   /**

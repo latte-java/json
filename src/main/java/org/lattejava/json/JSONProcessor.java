@@ -172,7 +172,7 @@ public final class JSONProcessor extends AbstractProcessor {
       TypeView e = type.element();
       return e != null && !e.isCollection() && isSupportedComponentType(e);
     }
-    return type.isPrimitive() || type.isNumeric() || type.isBool() || type.isStringForm();
+    return type.isPrimitive() || type.isNumeric() || type.isBool() || type.isStringForm() || type.isNested();
   }
 
   private String qualified(Element e) {

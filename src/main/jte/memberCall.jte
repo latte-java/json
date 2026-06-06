@@ -1,7 +1,7 @@
 @param org.lattejava.json.jte.TypeView type
 @param String key
 @param String val
-${type.isEnum() ? "string(" + key + ", " + val + " == null ? null : " + val + ".name())" : switch (type.name()) {
+${type.isNested() ? "object(" + key + ", " + val + " == null ? null : " + type.nestedCompanion() + ".toJSON(" + val + "))" : type.isEnum() ? "string(" + key + ", " + val + " == null ? null : " + val + ".name())" : switch (type.name()) {
   case "java.lang.String" -> "string(" + key + ", " + val + ")";
   case "boolean", "java.lang.Boolean" -> "bool(" + key + ", " + val + ")";
   case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" -> "integer(" + key + ", " + val + ")";

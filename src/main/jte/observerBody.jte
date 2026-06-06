@@ -68,6 +68,8 @@
 @for(Component c : view.components())
 @if(c.type().isMap())
       case "${c.name()}" -> { return new @template.cap(name = c.name())MapObserver(); }
+@elseif(c.type().isNested())
+      case "${c.name()}" -> { return new ${c.type().nestedCompanion()}(); }
 @endif
 @endfor
     }
@@ -77,7 +79,7 @@
   @Override public void object(String key, Object value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isMap())
+@if(c.type().isMap() || c.type().isNested())
       case "${c.name()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
 @endif
 @endfor
