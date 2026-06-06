@@ -3,7 +3,7 @@
 @param String val
 !{
   String call;
-  if (type.isNested()) {
+  if (type.hasCompanion()) {
     call = "object(" + key + ", " + val + " == null ? null : " + type.nestedCompanion() + ".toJSON(" + val + "))";
   } else if (type.isEnum()) {
     call = "string(" + key + ", " + val + " == null ? null : " + val + ".name())";

@@ -2,7 +2,7 @@
 @param String expr
 !{
   String call;
-  if (type.isNested()) {
+  if (type.hasCompanion()) {
     call = ".raw(" + expr + " == null ? null : " + type.nestedCompanion() + ".toJSON(" + expr + "))";
   } else if (type.isEnum()) {
     call = ".string(" + expr + " == null ? null : " + expr + ".name())";

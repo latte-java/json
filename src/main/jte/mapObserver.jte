@@ -12,7 +12,7 @@
   }
   private static final class @template.cap(name = c.name())MapObserver implements JSONObserver<@template.declType(type = c.type())> {
     private final @template.declType(type = c.type()) map = new java.util.LinkedHashMap<>();
-@if(valType.isNested())
+@if(valType.hasCompanion())
     @Override public void string(String key, String value) { ${stub} }
     @Override public void integer(String key, long value) { ${stub} }
     @Override public void bigInteger(String key, java.math.BigInteger value) { ${stub} }
@@ -39,7 +39,7 @@
 @endif
     @Override public void nullValue(String key) { map.put(@template.fromString(type = keyType, expr = "key"), null); }
     @Override public @template.declType(type = c.type()) finish() { return map; }
-@if(valType.isNested())
+@if(valType.hasCompanion())
     @Override public JSONObjectHandler beginObject(String key) { return new ${valType.nestedCompanion()}(); }
     @Override public JSONArrayObserver<?> beginArray(String key) { throw new JSONProcessingException("nested collections unsupported"); }
     @Override public void object(String key, Object value) { map.put(@template.fromString(type = keyType, expr = "key"), (${valType.decl()}) value); }

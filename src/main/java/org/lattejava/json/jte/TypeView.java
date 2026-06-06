@@ -10,6 +10,7 @@ import module java.compiler;
 import javax.lang.model.type.TypeKind;
 
 import org.lattejava.json.JSON;
+import org.lattejava.json.JSONTypeInfo;
 
 /**
  * Template-facing facts about one declared type — the "type part" of companion generation. Exposes only what the JTE
@@ -37,11 +38,21 @@ public final class TypeView {
    * record (so no import is needed and same-simple-name collisions cannot occur), else the simple name.
    */
   public String decl() {
-    return isNested() ? name() : simpleName();
+    return hasCompanion() ? name() : simpleName();
   }
 
   public TypeView element() {
     return arg(0);
+  }
+
+  /**
+   * Whether this type has a generated {@code <X>JSON} companion to dispatch to — a nested {@code @JSON} record
+   * (an object companion) or a polymorphic {@code @JSON} sealed interface (a {@code JSONPolymorphicObserver}). Both
+   * are serialized via {@code <X>JSON.toJSON} and deserialized by returning {@code new <X>JSON()} from a
+   * {@code beginObject}.
+   */
+  public boolean hasCompanion() {
+    return isNested() || isPolymorphic();
   }
 
   public boolean isBool() {
@@ -81,6 +92,20 @@ public final class TypeView {
 
   public boolean isNumeric() {
     return NUMERIC.contains(name());
+  }
+
+  /**
+   * Whether this type is a polymorphic {@code @JSON} hierarchy: an interface carrying both {@code @JSON} and
+   * {@code @JSONTypeInfo}. Its companion is a {@code JSONPolymorphicObserver}.
+   */
+  public boolean isPolymorphic() {
+    if (type.getKind() != TypeKind.DECLARED) {
+      return false;
+    }
+    Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+    return element.getKind() == ElementKind.INTERFACE
+        && element.getAnnotation(JSON.class) != null
+        && element.getAnnotation(JSONTypeInfo.class) != null;
   }
 
   public boolean isPrimitive() {
