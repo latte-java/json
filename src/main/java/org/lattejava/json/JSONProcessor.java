@@ -48,6 +48,10 @@ public final class JSONProcessor extends AbstractProcessor {
     for (Element e : annotated) {
       TypeElement type = (TypeElement) e;
       boolean polyParent = e.getKind() == ElementKind.INTERFACE && type.getAnnotation(JSONTypeInfo.class) != null;
+      if (e.getKind() == ElementKind.INTERFACE && type.getAnnotation(JSONTypeInfo.class) == null) {
+        error(e, "@JSON interface [" + type.getQualifiedName() + "] requires @JSONTypeInfo to declare its discriminator");
+        continue;
+      }
       if (e.getKind() != ElementKind.RECORD && !polyParent) {
         error(e, "@JSON supports only records and sealed @JSONTypeInfo interfaces in this release; ["
             + qualified(e) + "] is a [" + e.getKind() + "]");
@@ -61,6 +65,9 @@ public final class JSONProcessor extends AbstractProcessor {
       }
 
       if (polyParent) {
+        if (!validatePolymorphic(type)) {
+          continue;
+        }
         if (!helpersEmitted) {
           emitHelpers(module);
           helpersEmitted = true;
@@ -137,6 +144,12 @@ public final class JSONProcessor extends AbstractProcessor {
         discriminatorValue = discriminatorValueOf(record);
         break;
       }
+    }
+
+    if (discriminatorKey.isEmpty() && record.getAnnotation(JSONSubtype.class) != null) {
+      error(record, "@JSONSubtype on [" + record.getQualifiedName()
+          + "] requires an implemented @JSONTypeInfo interface");
+      return;
     }
 
     CompanionView view = new CompanionView(companionPkg, internalPkg, qualifiedType, simpleName, companion,
@@ -259,6 +272,43 @@ public final class JSONProcessor extends AbstractProcessor {
   private boolean readStrict(TypeElement record) {
     JSON ann = record.getAnnotation(JSON.class);
     return ann != null && ann.strict();
+  }
+
+  private boolean validatePolymorphic(TypeElement iface) {
+    boolean ok = true;
+    if (!iface.getModifiers().contains(javax.lang.model.element.Modifier.SEALED)) {
+      error(iface, "@JSONTypeInfo type [" + iface.getQualifiedName() + "] must be a sealed interface");
+      return false;
+    }
+
+    String property = iface.getAnnotation(JSONTypeInfo.class).property();
+    Map<String, String> seenValues = new HashMap<>();
+    for (TypeMirror permitted : iface.getPermittedSubclasses()) {
+      TypeElement sub = (TypeElement) ((javax.lang.model.type.DeclaredType) permitted).asElement();
+      if (sub.getAnnotation(JSON.class) == null) {
+        error(iface, "permitted subtype [" + sub.getQualifiedName() + "] of @JSONTypeInfo type ["
+            + iface.getQualifiedName() + "] must be annotated @JSON");
+        ok = false;
+        continue;
+      }
+
+      String value = discriminatorValueOf(sub);
+      String prior = seenValues.put(value, sub.getSimpleName().toString());
+      if (prior != null) {
+        error(iface, "duplicate discriminator value [" + value + "] on subtypes [" + prior + "] and ["
+            + sub.getSimpleName() + "] of @JSONTypeInfo type [" + iface.getQualifiedName() + "]");
+        ok = false;
+      }
+
+      for (RecordComponentElement c : sub.getRecordComponents()) {
+        if (c.getSimpleName().toString().equals(property)) {
+          error(iface, "discriminator property [" + property + "] collides with component [" + c.getSimpleName()
+              + "] on subtype [" + sub.getSimpleName() + "]");
+          ok = false;
+        }
+      }
+    }
+    return ok;
   }
 
   private boolean validateComponents(TypeElement record) {
