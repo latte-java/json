@@ -175,6 +175,11 @@ public final class JSONProcessor extends AbstractProcessor {
     return type.isPrimitive() || type.isNumeric() || type.isBool() || type.isStringForm() || type.isNested();
   }
 
+  private String notJSON(RecordComponentElement c, TypeView t) {
+    return "@JSON component [" + c.getSimpleName() + "] references record type [" + t.name()
+        + "] which is not @JSON-annotated; add @JSON to it or remove the component";
+  }
+
   private String qualified(Element e) {
     return e instanceof TypeElement t ? t.getQualifiedName().toString() : e.toString();
   }
@@ -213,8 +218,9 @@ public final class JSONProcessor extends AbstractProcessor {
           }
 
           if (!isSupportedComponentType(v)) {
-            error(c, "@JSON component [" + c.getSimpleName() + "] has an unsupported Map value type ["
-                + v.name() + "]");
+            error(c, v.isRecord() && !v.isNested() ? notJSON(c, v)
+                : "@JSON component [" + c.getSimpleName() + "] has an unsupported Map value type ["
+                  + v.name() + "]");
             ok = false;
             continue;
           }
@@ -231,8 +237,9 @@ public final class JSONProcessor extends AbstractProcessor {
         }
 
         if (!isSupportedComponentType(e)) {
-          error(c, "@JSON component [" + c.getSimpleName() + "] has an unsupported "
-              + type.kind() + " element type [" + e.name() + "]");
+          error(c, e.isRecord() && !e.isNested() ? notJSON(c, e)
+              : "@JSON component [" + c.getSimpleName() + "] has an unsupported "
+                + type.kind() + " element type [" + e.name() + "]");
           ok = false;
           continue;
         }
@@ -241,9 +248,10 @@ public final class JSONProcessor extends AbstractProcessor {
       }
 
       if (!isSupportedComponentType(type)) {
-        error(c, "@JSON component [" + c.getSimpleName() + "] has unsupported type ["
-            + type.name() + "] (supported: primitives, boxed primitives, String, "
-            + "BigInteger, BigDecimal, enums, UUID, and java.time types)");
+        error(c, type.isRecord() && !type.isNested() ? notJSON(c, type)
+            : "@JSON component [" + c.getSimpleName() + "] has unsupported type ["
+              + type.name() + "] (supported: primitives, boxed primitives, String, "
+              + "BigInteger, BigDecimal, enums, UUID, java.time types, and @JSON records)");
         ok = false;
       }
     }
