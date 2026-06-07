@@ -42,4 +42,8 @@ public class PolyRejectionTest {
   @Test public void interfaceWithoutTypeInfoRejected() throws Exception {
     assertFailsWith("badpoly_notypeinfo", "@JSONTypeInfo", "Bare");
   }
+
+  @Test public void nonRecordSubtypeRejected() throws Exception {
+    assertFailsWith("badpoly_nonrecordsub", "must be a record", "Mid");
+  }
 }

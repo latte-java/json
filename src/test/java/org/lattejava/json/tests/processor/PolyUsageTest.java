@@ -66,4 +66,27 @@ public class PolyUsageTest {
       assertEquals(householdJson.getMethod("toJSON", household).invoke(null, o), json);
     }
   }
+
+  @Test
+  public void nullPolymorphicFieldOmittedByDefault() throws Exception {
+    try (var loader = (URLClassLoader) poly.loader()) {
+      Class<?> ownerJson = loader.loadClass("demo.internal.OwnerJSON");
+      Class<?> owner = loader.loadClass("demo.Owner");
+      String json = "{\"name\":\"Sam\"}";
+      Object o = ownerJson.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(ownerJson.getMethod("toJSON", owner).invoke(null, o), json);
+    }
+  }
+
+  @Test
+  public void nullPolymorphicListElementEmittedAsNull() throws Exception {
+    try (var loader = (URLClassLoader) poly.loader()) {
+      Class<?> kennelJson = loader.loadClass("demo.internal.KennelJSON");
+      Class<?> kennel = loader.loadClass("demo.Kennel");
+      String json = "{\"name\":\"Acme\",\"pets\":["
+          + "{\"petType\":\"Dog\",\"name\":\"Rex\",\"packSize\":3},null]}";
+      Object o = kennelJson.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(kennelJson.getMethod("toJSON", kennel).invoke(null, o), json);
+    }
+  }
 }

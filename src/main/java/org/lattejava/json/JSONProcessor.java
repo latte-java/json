@@ -292,6 +292,13 @@ public final class JSONProcessor extends AbstractProcessor {
         continue;
       }
 
+      if (sub.getKind() != ElementKind.RECORD) {
+        error(iface, "permitted subtype [" + sub.getQualifiedName() + "] of @JSONTypeInfo type ["
+            + iface.getQualifiedName() + "] must be a record");
+        ok = false;
+        continue;
+      }
+
       String value = discriminatorValueOf(sub);
       String prior = seenValues.put(value, sub.getSimpleName().toString());
       if (prior != null) {
