@@ -121,8 +121,7 @@ public final class JSONProcessor extends AbstractProcessor {
 
   void generateCompanion(TypeElement record, ModuleElement module) {
     String internalPkg = module.getQualifiedName() + ".internal";
-    String typePkg = processingEnv.getElementUtils().getPackageOf(record).getQualifiedName().toString();
-    String companionPkg = typePkg.isEmpty() ? "internal" : typePkg + ".internal";
+    String companionPkg = internalPackageOf(record);
     String simpleName = record.getSimpleName().toString();
     String companion = simpleName + "JSON";
     String qualifiedType = record.getQualifiedName().toString();
@@ -137,8 +136,7 @@ public final class JSONProcessor extends AbstractProcessor {
     String discriminatorKey = "";
     String discriminatorValue = "";
     for (TypeMirror itf : record.getInterfaces()) {
-      TypeElement itfEl = (TypeElement) ((javax.lang.model.type.DeclaredType) itf).asElement();
-      JSONTypeInfo ti = itfEl.getAnnotation(JSONTypeInfo.class);
+      JSONTypeInfo ti = asTypeElement(itf).getAnnotation(JSONTypeInfo.class);
       if (ti != null) {
         discriminatorKey = ti.property();
         discriminatorValue = discriminatorValueOf(record);
@@ -171,8 +169,7 @@ public final class JSONProcessor extends AbstractProcessor {
 
   void generatePolymorphic(TypeElement iface, ModuleElement module) {
     String internalPkg = module.getQualifiedName() + ".internal";
-    String typePkg = processingEnv.getElementUtils().getPackageOf(iface).getQualifiedName().toString();
-    String companionPkg = typePkg.isEmpty() ? "internal" : typePkg + ".internal";
+    String companionPkg = internalPackageOf(iface);
     String simpleName = iface.getSimpleName().toString();
     String companion = simpleName + "JSON";
     String qualifiedType = iface.getQualifiedName().toString();
@@ -180,13 +177,11 @@ public final class JSONProcessor extends AbstractProcessor {
 
     List<PolymorphicView.Subtype> subtypes = new ArrayList<>();
     for (TypeMirror permitted : iface.getPermittedSubclasses()) {
-      TypeElement sub = (TypeElement) ((javax.lang.model.type.DeclaredType) permitted).asElement();
-      String subPkg = processingEnv.getElementUtils().getPackageOf(sub).getQualifiedName().toString();
-      String subCompanionPkg = subPkg.isEmpty() ? "internal" : subPkg + ".internal";
+      TypeElement sub = asTypeElement(permitted);
       subtypes.add(new PolymorphicView.Subtype(
           discriminatorValueOf(sub),
           sub.getQualifiedName().toString(),
-          subCompanionPkg + "." + sub.getSimpleName() + "JSON"));
+          internalPackageOf(sub) + "." + sub.getSimpleName() + "JSON"));
     }
 
     PolymorphicView view = new PolymorphicView(companionPkg, internalPkg, qualifiedType, simpleName,
@@ -203,6 +198,10 @@ public final class JSONProcessor extends AbstractProcessor {
           "Failed writing companion [" + companionPkg + "." + companion + "]: " + ioe.getMessage(),
           iface);
     }
+  }
+
+  private TypeElement asTypeElement(TypeMirror type) {
+    return (TypeElement) ((javax.lang.model.type.DeclaredType) type).asElement();
   }
 
   /**
@@ -235,6 +234,13 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private void error(Element e, String message) {
     processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, e);
+  }
+
+  /** The {@code <typePackage>.internal} package that holds {@code element}'s companion (just {@code internal} when the
+   * type is in the unnamed package). The single source of this naming rule on the processor side. */
+  private String internalPackageOf(Element element) {
+    String pkg = processingEnv.getElementUtils().getPackageOf(element).getQualifiedName().toString();
+    return pkg.isEmpty() ? "internal" : pkg + ".internal";
   }
 
   /**
@@ -284,7 +290,7 @@ public final class JSONProcessor extends AbstractProcessor {
     String property = iface.getAnnotation(JSONTypeInfo.class).property();
     Map<String, String> seenValues = new HashMap<>();
     for (TypeMirror permitted : iface.getPermittedSubclasses()) {
-      TypeElement sub = (TypeElement) ((javax.lang.model.type.DeclaredType) permitted).asElement();
+      TypeElement sub = asTypeElement(permitted);
       if (sub.getAnnotation(JSON.class) == null) {
         error(iface, "permitted subtype [" + sub.getQualifiedName() + "] of @JSONTypeInfo type ["
             + iface.getQualifiedName() + "] must be annotated @JSON");

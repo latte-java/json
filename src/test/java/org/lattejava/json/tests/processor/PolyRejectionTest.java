@@ -14,8 +14,8 @@ public class PolyRejectionTest {
     var r = ProcessorHarness.compile(fixture);
     assertFalse(r.success(), fixture + " must fail compilation");
     assertTrue(r.diagnostics().stream().anyMatch(d ->
-            java.util.Arrays.stream(needles).allMatch(d::contains)),
-        "expected a diagnostic containing " + java.util.Arrays.toString(needles)
+            Arrays.stream(needles).allMatch(d::contains)),
+        "expected a diagnostic containing " + Arrays.toString(needles)
             + ", got: " + r.diagnostics());
   }
 
