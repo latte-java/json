@@ -45,6 +45,17 @@ public final class JSONProcessor extends AbstractProcessor {
     }
 
     Set<? extends Element> annotated = roundEnv.getElementsAnnotatedWith(jsonAnno);
+
+    // All @JSON types in a compilation share one module (cross-module @JSON references are unsupported), so the helper
+    // set is emitted once into that module's .internal, before any companion is generated.
+    if (!helpersEmitted && !annotated.isEmpty()) {
+      ModuleElement module = processingEnv.getElementUtils().getModuleOf(annotated.iterator().next());
+      if (module != null && !module.isUnnamed()) {
+        emitHelpers(module);
+        helpersEmitted = true;
+      }
+    }
+
     for (Element e : annotated) {
       TypeElement type = (TypeElement) e;
       boolean polyParent = e.getKind() == ElementKind.INTERFACE && type.getAnnotation(JSONTypeInfo.class) != null;
@@ -68,21 +79,12 @@ public final class JSONProcessor extends AbstractProcessor {
         if (!validatePolymorphic(type)) {
           continue;
         }
-        if (!helpersEmitted) {
-          emitHelpers(module);
-          helpersEmitted = true;
-        }
         generatePolymorphic(type, module);
         continue;
       }
 
       if (!validateComponents(type)) {
         continue;
-      }
-
-      if (!helpersEmitted) {
-        emitHelpers(module);
-        helpersEmitted = true;
       }
 
       generateCompanion(type, module);
