@@ -8,7 +8,7 @@
 @endif
 @for(Component c : view.components())
 @if(c.type().isStringForm())
-      case "${c.name()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
+      case "${c.wireKey()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -18,7 +18,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isNumeric())
-      case "${c.name()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "integer");
+      case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "integer");
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -28,7 +28,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isNumeric())
-      case "${c.name()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "bigInteger");
+      case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "bigInteger");
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -38,7 +38,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isNumeric())
-      case "${c.name()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "decimal");
+      case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "decimal");
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -48,7 +48,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isBool())
-      case "${c.name()}" -> this.${c.name()} = value;
+      case "${c.wireKey()}" -> this.${c.name()} = value;
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -58,9 +58,9 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isPrimitive())
-      case "${c.name()}" -> throw new JSONProcessingException("null for primitive field [${c.name()}]");
+      case "${c.wireKey()}" -> throw new JSONProcessingException("null for primitive field [${c.name()}]");
 @else
-      case "${c.name()}" -> this.${c.name()} = null;
+      case "${c.wireKey()}" -> this.${c.name()} = null;
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -70,9 +70,9 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isMap())
-      case "${c.name()}" -> { return new @template.cap(name = c.name())MapObserver(); }
+      case "${c.wireKey()}" -> { return new @template.cap(name = c.name())MapObserver(); }
 @elseif(c.type().hasCompanion())
-      case "${c.name()}" -> { return new ${c.type().nestedCompanion()}(); }
+      case "${c.wireKey()}" -> { return new ${c.type().nestedCompanion()}(); }
 @endif
 @endfor
     }
@@ -83,7 +83,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isMap() || c.type().hasCompanion())
-      case "${c.name()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
+      case "${c.wireKey()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
 @endif
 @endfor
       @template.defaultArm(view = view)
@@ -93,7 +93,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isList() || c.type().isSet())
-      case "${c.name()}" -> { return new @template.cap(name = c.name())ArrayObserver(); }
+      case "${c.wireKey()}" -> { return new @template.cap(name = c.name())ArrayObserver(); }
 @endif
 @endfor
     }
@@ -104,7 +104,7 @@
     switch (key) {
 @for(Component c : view.components())
 @if(c.type().isList() || c.type().isSet())
-      case "${c.name()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
+      case "${c.wireKey()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
 @endif
 @endfor
       @template.defaultArm(view = view)

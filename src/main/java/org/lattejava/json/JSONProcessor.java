@@ -128,10 +128,11 @@ public final class JSONProcessor extends AbstractProcessor {
     String companion = simpleName + "JSON";
     String qualifiedType = record.getQualifiedName().toString();
 
+    NamingStrategy naming = readNaming(record);
     List<Component> components = new ArrayList<>();
     Set<String> enumImports = new TreeSet<>();
     for (RecordComponentElement c : record.getRecordComponents()) {
-      components.add(new Component(processingEnv, c));
+      components.add(new Component(processingEnv, c, naming));
       collectEnums(new TypeView(processingEnv, c.asType()), enumImports);
     }
 
@@ -270,6 +271,11 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private String qualified(Element e) {
     return e instanceof TypeElement t ? t.getQualifiedName().toString() : e.toString();
+  }
+
+  private NamingStrategy readNaming(TypeElement record) {
+    JSON ann = record.getAnnotation(JSON.class);
+    return ann == null ? NamingStrategy.IDENTITY : ann.naming();
   }
 
   private boolean readOmitNulls(TypeElement record) {
