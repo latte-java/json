@@ -68,4 +68,13 @@ public class NamingCodegenTest {
     String json = "{\"outer_name\":\"o\",\"inner_thing\":{\"inner-field\":\"i\"}}";
     assertEquals(roundTrip("demo.Outer", "demo.internal.OuterJSON", json), json);
   }
+
+  @Test
+  public void duplicateWireKeyRejected() throws Exception {
+    var r = ProcessorHarness.compile("badnaming");
+    assertFalse(r.success(), "duplicate wire key must fail compilation");
+    assertTrue(r.diagnostics().stream().anyMatch(d ->
+            d.contains("duplicate JSON key") && d.contains("[id]")),
+        "expected a duplicate-key error for [id], got: " + r.diagnostics());
+  }
 }

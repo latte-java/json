@@ -334,7 +334,15 @@ public final class JSONProcessor extends AbstractProcessor {
 
   private boolean validateComponents(TypeElement record) {
     boolean ok = true;
+    NamingStrategy naming = readNaming(record);
+    Map<String, String> wireKeys = new HashMap<>();
     for (RecordComponentElement c : record.getRecordComponents()) {
+      String wireKey = Component.wireKey(c, naming);
+      String prior = wireKeys.put(wireKey, c.getSimpleName().toString());
+      if (prior != null) {
+        error(c, "duplicate JSON key [" + wireKey + "] on components [" + prior + "] and [" + c.getSimpleName() + "]");
+        ok = false;
+      }
       TypeView type = new TypeView(processingEnv, c.asType());
       if (type.isCollection()) {
         if (type.isMap()) {
