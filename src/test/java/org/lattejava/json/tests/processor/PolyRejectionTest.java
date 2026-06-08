@@ -46,4 +46,8 @@ public class PolyRejectionTest {
   @Test public void nonRecordSubtypeRejected() throws Exception {
     assertFailsWith("badpoly_nonrecordsub", "must be a record", "Mid");
   }
+
+  @Test public void renamedDiscriminatorCollisionRejected() throws Exception {
+    assertFailsWith("badpoly_rename_collision", "discriminator property", "kind");
+  }
 }

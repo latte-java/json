@@ -321,10 +321,11 @@ public final class JSONProcessor extends AbstractProcessor {
         ok = false;
       }
 
+      NamingStrategy subNaming = readNaming(sub);
       for (RecordComponentElement c : sub.getRecordComponents()) {
-        if (c.getSimpleName().toString().equals(property)) {
-          error(iface, "discriminator property [" + property + "] collides with component [" + c.getSimpleName()
-              + "] on subtype [" + sub.getSimpleName() + "]");
+        if (Component.wireKey(c, subNaming).equals(property)) {
+          error(iface, "discriminator property [" + property + "] collides with the JSON key of component ["
+              + c.getSimpleName() + "] on subtype [" + sub.getSimpleName() + "]");
           ok = false;
         }
       }
@@ -338,6 +339,12 @@ public final class JSONProcessor extends AbstractProcessor {
     Map<String, String> wireKeys = new HashMap<>();
     for (RecordComponentElement c : record.getRecordComponents()) {
       String wireKey = Component.wireKey(c, naming);
+      if (wireKey.chars().anyMatch(ch -> ch == '"' || ch == '\\' || ch < 0x20)) {
+        error(c, "JSON key [" + wireKey + "] for component [" + c.getSimpleName()
+            + "] contains an invalid character (quote, backslash, or control character)");
+        ok = false;
+        continue;
+      }
       String prior = wireKeys.put(wireKey, c.getSimpleName().toString());
       if (prior != null) {
         error(c, "duplicate JSON key [" + wireKey + "] on components [" + prior + "] and [" + c.getSimpleName() + "]");

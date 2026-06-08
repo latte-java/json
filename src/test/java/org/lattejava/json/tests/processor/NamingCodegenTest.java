@@ -77,4 +77,13 @@ public class NamingCodegenTest {
             d.contains("duplicate JSON key") && d.contains("[id]")),
         "expected a duplicate-key error for [id], got: " + r.diagnostics());
   }
+
+  @Test
+  public void invalidWireKeyCharacterRejected() throws Exception {
+    var r = ProcessorHarness.compile("badnaming_badchar");
+    assertFalse(r.success(), "an invalid character in a JSON key must fail compilation");
+    assertTrue(r.diagnostics().stream().anyMatch(d ->
+            d.contains("invalid character") && d.contains("[value]")),
+        "expected an invalid-character error for [value], got: " + r.diagnostics());
+  }
 }
