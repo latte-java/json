@@ -9,8 +9,6 @@ import module java.base;
 /**
  * Declares a sealed interface or class polymorphic for JSON serialization. The discriminator property name
  * is required; OpenAPI semantics apply.
- * <p>
- * TODO: Not implemented yet.
  *
  * @author Brian Pontarelli
  */
