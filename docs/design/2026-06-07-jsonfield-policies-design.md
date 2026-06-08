@@ -1,12 +1,12 @@
-# @JSONField policies (ignore / readOnly / writeOnly / required / format)
+# @JSONField policies (ignore / readOnly / writeOnly / required / format / instant)
 
 **Date:** 2026-06-07
 **Status:** Approved (design); pending implementation plan
-**Scope:** Annotation-processor codegen for the remaining `@JSONField` attributes — `ignore`, `readOnly`, `writeOnly`, `required`, and `format` — plus their compile-time validation. This is **Cycle B** of the `@JSONField` + naming work (Cycle A shipped `name` + `@JSON(naming)`). Pure codegen change — no runtime change, no `module-info` change.
+**Scope:** Annotation-processor codegen for the remaining `@JSONField` attributes — `ignore`, `readOnly`, `writeOnly`, `required`, `format` — plus a **new `instant` attribute** (epoch-integer `Instant` representation, a new public enum) and the compile-time validation for all of them. This is **Cycle B** of the `@JSONField` + naming work (Cycle A shipped `name` + `@JSON(naming)`). No runtime change, no `module-info` change; one public-API addition (the `instant` attribute + its enum).
 
 ## Problem
 
-`@JSONField` is declared with six attributes; Cycle A wired only `name`. The other five are silently inert: a `@JSONField(required = true)` or `@JSONField(ignore = true)` compiles but does nothing. The design (§ "The `@JSONField` annotation") specifies each, but no codegen reads them and no validation guards their misuse.
+`@JSONField` is declared with six attributes; Cycle A wired only `name`. The other five are silently inert: a `@JSONField(required = true)` or `@JSONField(ignore = true)` compiles but does nothing. The design (§ "The `@JSONField` annotation") specifies each, but no codegen reads them and no validation guards their misuse. Separately, `Instant` has only one wire form today (ISO-8601 string), but epoch-integer timestamps are a common API convention that nothing supports.
 
 ## Goal
 
@@ -22,7 +22,7 @@ Read and honor `ignore`, `readOnly`, `writeOnly`, `required`, and `format` per r
 
 ### 1. The per-field policy model
 
-`Component` reads its `@JSONField` once and exposes: `ignore()`, `readOnly()`, `writeOnly()`, `required()` (booleans), and `format()` (the pattern, `""` when none). Two derived predicates drive template filtering:
+`Component` reads its `@JSONField` once and exposes: `ignore()`, `readOnly()`, `writeOnly()`, `required()` (booleans), `format()` (the pattern, `""` when none), and `instant()` (the `InstantFormat`, `ISO` when unset). Two derived predicates drive template filtering:
 
 - **`serialize()`** — appears in `toJSON`: `!ignore() && !writeOnly()`.
 - **`deserialize()`** — appears in the observer: `!ignore() && !readOnly()`.
@@ -65,25 +65,52 @@ The component's serialize/deserialize bypass the default ISO path (`toString()` 
 
 `DateTimeFormatter`, `ZoneOffset`, and the `java.time` types are all reachable via the companion's existing `import module java.base`.
 
-### 5. Validation (compile-time errors)
+### 5. `instant` — epoch-integer Instant representation
+
+A new public enum and a new `@JSONField` attribute let an `Instant` field be carried as a JSON **integer** epoch instead of a string:
+
+```java
+package org.lattejava.json;
+
+public enum InstantFormat {
+  ISO,            // default — string (ISO-8601, or the `format` pattern if set)
+  EPOCH_SECONDS,  // JSON integer, seconds since the epoch
+  EPOCH_MILLIS    // JSON integer, milliseconds since the epoch
+}
+```
+
+`@JSONField` gains `InstantFormat instant() default InstantFormat.ISO;`. (Enum/attribute names are easy to revise; `ISO` as the default keeps every existing `Instant` field unchanged.)
+
+For an `Instant` component with `instant != ISO`, codegen routes through the numeric path instead of the string path:
+
+- **Serialize:** `.integer("<wireKey>", value.<name>() == null ? null : value.<name>().toEpochMilli())` (or `.getEpochSecond()`), null-safe via the existing boxed-`integer` overload.
+- **Deserialize** (in the `integer(String key, long value)` callback, since the wire form is a JSON number): `case "<wireKey>" -> this.<name> = Instant.ofEpochMilli(value);` (or `Instant.ofEpochSecond(value)`).
+
+Such a component is therefore **excluded** from the `string(...)` callback (it is not a string on the wire) and **added** to the `integer(...)` callback (alongside the numeric components). `ISO` instants are unchanged — string via `Conversions.toInstant`/`toString`, or via the `format` pattern when set.
+
+### 6. Validation (compile-time errors)
 
 Reported on the offending component via `Messager.printMessage(ERROR, …)`, generating no companion:
 
 - `readOnly = true` **and** `writeOnly = true` together — equivalent to `ignore`, ambiguous.
-- `ignore = true` combined with any of `name`/`required`/`format`/`readOnly`/`writeOnly` — the others have no effect.
+- `ignore = true` combined with any of `name`/`required`/`format`/`readOnly`/`writeOnly`/`instant` — the others have no effect.
 - `readOnly = true` **and** `required = true` — contradictory: a serialize-only field is never read, so it can never be "present" on input.
 - `format` on a component whose type is not one of the five supported `java.time` types.
 - `format` whose pattern is not a valid `DateTimeFormatter.ofPattern(...)` string (caught by trying it in the processor), or contains a `"` or `\` (would break the baked literal) — a clear diagnostic instead of broken generated source.
+- `instant != ISO` on a component whose type is not `Instant` — the epoch representation is `Instant`-only.
+- `instant != ISO` **and** a non-empty `format` together — the field can't be both a JSON integer (epoch) and a JSON string (pattern).
 
-### 6. Files touched
+### 7. Files touched
 
-- `src/main/java/org/lattejava/json/jte/Component.java` — read `@JSONField` into `ignore`/`readOnly`/`writeOnly`/`required`/`format`; expose `serialize()`/`deserialize()`/`required()`/`format()` and the formatter facts (`isFormatted()`, `formatterField()`, the temporal-query type name).
+- **New** `src/main/java/org/lattejava/json/InstantFormat.java` — the `ISO`/`EPOCH_SECONDS`/`EPOCH_MILLIS` enum (public, in the exported package, alongside `NamingStrategy`).
+- `src/main/java/org/lattejava/json/JSONField.java` — add `InstantFormat instant() default InstantFormat.ISO;`.
+- `src/main/java/org/lattejava/json/jte/Component.java` — read `@JSONField` into `ignore`/`readOnly`/`writeOnly`/`required`/`format`/`instant`; expose `serialize()`/`deserialize()`/`required()`/`format()`/`instant()` and the formatter facts (`isFormatted()`, `formatterField()`, the temporal-query type name).
 - `src/main/java/org/lattejava/json/jte/CompanionView.java` — convenience views as needed (e.g. `requiredComponents()`), or the templates filter `components()` inline.
-- `src/main/jte/companion.jte` — emit formatter fields; filter builder member calls by `serialize()`; route formatted components through the formatter.
-- `src/main/jte/observerBody.jte` — filter `case` labels by `deserialize()`; route formatted components through the formatter in `string(...)`; emit `<name>$seen` sets and the required-key checks in `finish()`.
-- `src/main/java/org/lattejava/json/JSONProcessor.java` — the §5 validation (in `validateComponents`).
+- `src/main/jte/companion.jte` — emit formatter fields; filter builder member calls by `serialize()`; route `format` components through the formatter and epoch-`instant` components through `.integer(... epoch ...)`.
+- `src/main/jte/observerBody.jte` — filter `case` labels by `deserialize()`; route `format` components through the formatter in `string(...)`, exclude epoch-`instant` components from `string(...)` and add them to `integer(...)`; emit `<name>$seen` sets and the required-key checks in `finish()`.
+- `src/main/java/org/lattejava/json/JSONProcessor.java` — the §6 validation (in `validateComponents`).
 
-### 7. Conventions
+### 8. Conventions
 
 New code follows the project rules: SPDX header, uppercase acronyms, `[brackets]` around runtime values in compile-time and runtime error messages, module imports, alphabetization and in-class member order.
 
@@ -96,7 +123,8 @@ New fixtures under `src/test/resources/fixtures/policies/` driven through the re
 - **`writeOnly`:** deserialized but not serialized — absent from `toJSON`; an incoming value populates the field.
 - **`required`:** present key (incl. explicit `null`) round-trips; an absent required key throws "Missing required JSON key [..]"; tracking emitted only for required fields. A required collection/nested field too.
 - **`format`:** each of the five types round-trips with a custom pattern (e.g. `LocalDate` `"MM/dd/yyyy"`, `Instant` with a zoned pattern); the wire form uses the pattern, not ISO.
-- **Rejections:** `readOnly`+`writeOnly`; `ignore`+another attribute; `readOnly`+`required`; `format` on `Duration`/non-time; an invalid/`"`-containing pattern.
+- **`instant`:** an `Instant` field with `EPOCH_SECONDS` and one with `EPOCH_MILLIS` round-trip as JSON **integers** (not strings), with the correct unit; a default (`ISO`) `Instant` is unchanged.
+- **Rejections:** `readOnly`+`writeOnly`; `ignore`+another attribute; `readOnly`+`required`; `format` on `Duration`/non-time; an invalid/`"`-containing pattern; `instant` on a non-`Instant` field; `instant`+`format` together.
 - **Composition:** `readOnly`/`format` combined with `@JSON(naming)` (wire key from Cycle A, direction/format from Cycle B); `required` + `writeOnly` together.
 
 All existing 219 tests stay green — a component with no `@JSONField` (or only `name`) is unchanged (`serialize()` and `deserialize()` both true, not required, not formatted).
@@ -112,4 +140,5 @@ All existing 219 tests stay green — a component with no `@JSONField` (or only 
 
 - **`required` as non-null** (vs key-present) — rejected: "required" is about presence on the wire (OpenAPI `required` is presence), and a nullable field that is explicitly `null` is present. Non-null validation is a different concern not in scope.
 - **Excluding `Instant` from `format`** — considered (it needs a zoned formatter), but included per the chosen scope using `DateTimeFormatter.ofPattern(...).withZone(ZoneOffset.UTC)` and the `Instant::from` query.
+- **`instant` as a boolean** (`instant = true`) — rejected: a boolean fixes one epoch unit forever. The tri-state `InstantFormat` enum (`ISO`/`EPOCH_SECONDS`/`EPOCH_MILLIS`) makes both units selectable and keeps `ISO` as the no-op default. `format` (string patterns) and `instant` (integer epoch) are deliberately separate attributes because they're different wire shapes; setting both is the §6 conflict error.
 - **Filtering collection scaffolding by direction** (not just `ignore`) — rejected as needless complexity; an unused `private` helper is harmless and keeps direction filtering at the call sites only.
