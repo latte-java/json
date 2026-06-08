@@ -47,7 +47,7 @@ Naming composes cleanly with nested objects and polymorphism: a parent's compone
 
 ### 3. Word-splitting algorithm (acronym-aware standard)
 
-A build-time utility `NamingStrategies` (public final class in `org.lattejava.json.jte`, build-time only — never a runtime helper, never in `HELPERS`) exposes `public static String apply(NamingStrategy strategy, String javaName)`.
+A build-time utility `NamingStrategies` (public final class in the **exported** `org.lattejava.json` package — so the test module can unit-test it, as the old `Template` class did; `org.lattejava.json.jte` is not exported) exposes `public static String apply(NamingStrategy strategy, String javaName)`. Build-time only — never a runtime helper, never in `HELPERS`, and not matched by `project.latte`'s copy patterns, so it is never emitted into a consumer.
 
 For `IDENTITY`, the Java name is returned unchanged. For all others, the Java name is split into words, each word lowercased, then re-joined per the strategy.
 
@@ -75,7 +75,7 @@ Two components on one type resolving to the **same** wire key — via two `@JSON
 
 ### 5. Files touched
 
-- **New** `src/main/java/org/lattejava/json/jte/NamingStrategies.java` — the build-time converter.
+- **New** `src/main/java/org/lattejava/json/NamingStrategies.java` — the build-time converter (exported package, for testability).
 - **New** `src/test/java/org/lattejava/json/tests/processor/NamingStrategiesTest.java` — unit tests for the converter.
 - `src/main/java/org/lattejava/json/jte/Component.java` — add `wireKey()`; the constructor takes the resolved `NamingStrategy` and reads the component's `@JSONField(name)`.
 - `src/main/jte/companion.jte` — the builder key arguments use `c.wireKey()` (the `memberCall` `key`, and the `.array`/`.object` literals for collection components).
