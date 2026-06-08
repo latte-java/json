@@ -350,6 +350,20 @@ public final class JSONProcessor extends AbstractProcessor {
         error(c, "duplicate JSON key [" + wireKey + "] on components [" + prior + "] and [" + c.getSimpleName() + "]");
         ok = false;
       }
+      JSONField policy = c.getAnnotation(JSONField.class);
+      if (policy != null) {
+        if (policy.readOnly() && policy.writeOnly()) {
+          error(c, "@JSONField component [" + c.getSimpleName() + "] is both readOnly and writeOnly (equivalent to ignore)");
+          ok = false;
+          continue;
+        }
+        if (policy.ignore() && (!policy.name().isEmpty() || !policy.format().isEmpty()
+            || policy.readOnly() || policy.writeOnly() || policy.instant() != InstantFormat.ISO)) {
+          error(c, "@JSONField component [" + c.getSimpleName() + "] combines ignore with another attribute, which has no effect");
+          ok = false;
+          continue;
+        }
+      }
       TypeView type = new TypeView(processingEnv, c.asType());
       if (type.isCollection()) {
         if (type.isMap()) {

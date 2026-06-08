@@ -7,7 +7,7 @@
       case "${view.discriminatorKey()}" -> { /* discriminator: ignore */ }
 @endif
 @for(Component c : view.components())
-@if(c.type().isStringForm())
+@if(c.deserialize() && c.type().isStringForm())
       case "${c.wireKey()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
 @endif
 @endfor
@@ -17,7 +17,7 @@
   @Override public void integer(String key, long value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isNumeric())
+@if(c.deserialize() && c.type().isNumeric())
       case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "integer");
 @endif
 @endfor
@@ -27,7 +27,7 @@
   @Override public void bigInteger(String key, BigInteger value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isNumeric())
+@if(c.deserialize() && c.type().isNumeric())
       case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "bigInteger");
 @endif
 @endfor
@@ -37,7 +37,7 @@
   @Override public void decimal(String key, BigDecimal value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isNumeric())
+@if(c.deserialize() && c.type().isNumeric())
       case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "decimal");
 @endif
 @endfor
@@ -47,7 +47,7 @@
   @Override public void bool(String key, boolean value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isBool())
+@if(c.deserialize() && c.type().isBool())
       case "${c.wireKey()}" -> this.${c.name()} = value;
 @endif
 @endfor
@@ -57,9 +57,9 @@
   @Override public void nullValue(String key) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isPrimitive())
+@if(c.deserialize() && c.type().isPrimitive())
       case "${c.wireKey()}" -> throw new JSONProcessingException("null for primitive field [${c.name()}]");
-@else
+@elseif(c.deserialize())
       case "${c.wireKey()}" -> this.${c.name()} = null;
 @endif
 @endfor
@@ -69,9 +69,9 @@
   @Override public JSONObjectHandler beginObject(String key) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isMap())
+@if(c.deserialize() && c.type().isMap())
       case "${c.wireKey()}" -> { return new @template.cap(name = c.name())MapObserver(); }
-@elseif(c.type().hasCompanion())
+@elseif(c.deserialize() && c.type().hasCompanion())
       case "${c.wireKey()}" -> { return new ${c.type().nestedCompanion()}(); }
 @endif
 @endfor
@@ -82,7 +82,7 @@
   @Override public void object(String key, Object value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isMap() || c.type().hasCompanion())
+@if(c.deserialize() && (c.type().isMap() || c.type().hasCompanion()))
       case "${c.wireKey()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
 @endif
 @endfor
@@ -92,7 +92,7 @@
   @Override public JSONArrayObserver<?> beginArray(String key) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isList() || c.type().isSet())
+@if(c.deserialize() && (c.type().isList() || c.type().isSet()))
       case "${c.wireKey()}" -> { return new @template.cap(name = c.name())ArrayObserver(); }
 @endif
 @endfor
@@ -103,7 +103,7 @@
   @Override public void array(String key, Object value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.type().isList() || c.type().isSet())
+@if(c.deserialize() && (c.type().isList() || c.type().isSet()))
       case "${c.wireKey()}" -> this.${c.name()} = (@template.declType(type = c.type())) value;
 @endif
 @endfor

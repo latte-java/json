@@ -46,12 +46,14 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
         .string("${view.discriminatorKey()}", "${view.discriminatorValue()}")
 @endif
 @for(Component c : view.components())
+@if(c.serialize())
 @if(c.type().isList() || c.type().isSet())
         .array("${c.wireKey()}", value.${c.name()}() == null ? null : ${c.name()}ToJSON(value.${c.name()}()))
 @elseif(c.type().isMap())
         .object("${c.wireKey()}", value.${c.name()}() == null ? null : ${c.name()}ToJSON(value.${c.name()}()))
 @else
         .@template.memberCall(type = c.type(), key = "\"" + c.wireKey() + "\"", val = "value." + c.name() + "()")
+@endif
 @endif
 @endfor
         ;
