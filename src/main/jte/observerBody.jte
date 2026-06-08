@@ -7,7 +7,9 @@
       case "${view.discriminatorKey()}" -> { /* discriminator: ignore */ }
 @endif
 @for(Component c : view.components())
-@if(c.deserialize() && c.type().isStringForm())
+@if(c.deserialize() && c.isFormatted())
+      case "${c.wireKey()}" -> this.${c.name()} = ${c.formatterField()}.parse(value, ${c.formatType()}::from);
+@elseif(c.deserialize() && c.type().isStringForm() && !c.isEpochInstant())
       case "${c.wireKey()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
 @endif
 @endfor
@@ -17,7 +19,9 @@
   @Override public void integer(String key, long value) {
     switch (key) {
 @for(Component c : view.components())
-@if(c.deserialize() && c.type().isNumeric())
+@if(c.deserialize() && c.isEpochInstant())
+      case "${c.wireKey()}" -> this.${c.name()} = Instant.${c.epochFactory()}(value);
+@elseif(c.deserialize() && c.type().isNumeric())
       case "${c.wireKey()}" -> this.${c.name()} = @template.narrow(type = c.type(), source = "integer");
 @endif
 @endfor

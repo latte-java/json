@@ -25,4 +25,16 @@ public class PolicyRejectionTest {
   @Test public void ignorePlusOtherRejected() throws Exception {
     assertFailsWith("badpolicy_ignoreplus", "ignore", "[value]");
   }
+
+  @Test public void formatOnNonTimeRejected() throws Exception {
+    assertFailsWith("badpolicy_formattype", "format", "[notATime]");
+  }
+
+  @Test public void instantOnNonInstantRejected() throws Exception {
+    assertFailsWith("badpolicy_instanttype", "instant", "[notAnInstant]");
+  }
+
+  @Test public void instantPlusFormatRejected() throws Exception {
+    assertFailsWith("badpolicy_instantformat", "instant and format", "[both]");
+  }
 }

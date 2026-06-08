@@ -45,4 +45,34 @@ public class PolicyCodegenTest {
       assertEquals(j.getMethod("toJSON", t).invoke(null, o), "{\"both\":\"b\",\"readOnly\":\"r\"}");
     }
   }
+
+  @Test
+  public void formatRoundTripsCustomPatterns() throws Exception {
+    try (var loader = (URLClassLoader) policies.loader()) {
+      Class<?> t = loader.loadClass("demo.Times");
+      Class<?> j = loader.loadClass("demo.internal.TimesJSON");
+      String json = "{\"date\":\"03/14/2026\",\"stamp\":\"2026-03-14T09:26:53\","
+          + "\"millis\":1741944413000,\"seconds\":1741944413}";
+      Object o = j.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(t.getMethod("date").invoke(o), java.time.LocalDate.of(2026, 3, 14));
+      assertEquals(t.getMethod("millis").invoke(o), java.time.Instant.ofEpochMilli(1741944413000L));
+      assertEquals(t.getMethod("seconds").invoke(o), java.time.Instant.ofEpochSecond(1741944413L));
+      assertEquals(j.getMethod("toJSON", t).invoke(null, o), json);
+    }
+  }
+
+  @Test
+  public void epochInstantsAreJSONIntegers() throws Exception {
+    try (var loader = (URLClassLoader) policies.loader()) {
+      Class<?> j = loader.loadClass("demo.internal.TimesJSON");
+      Class<?> t = loader.loadClass("demo.Times");
+      Object o = t.getConstructor(java.time.LocalDate.class, java.time.LocalDateTime.class,
+              java.time.Instant.class, java.time.Instant.class)
+          .newInstance(java.time.LocalDate.of(2026, 1, 1), java.time.LocalDateTime.of(2026, 1, 1, 0, 0, 0),
+              java.time.Instant.ofEpochMilli(1000L), java.time.Instant.ofEpochSecond(2L));
+      String json = (String) j.getMethod("toJSON", t).invoke(null, o);
+      assertTrue(json.contains("\"millis\":1000"), "epoch millis must be a bare integer, got: " + json);
+      assertTrue(json.contains("\"seconds\":2"), "epoch seconds must be a bare integer, got: " + json);
+    }
+  }
 }

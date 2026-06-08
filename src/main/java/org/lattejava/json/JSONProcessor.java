@@ -363,6 +363,45 @@ public final class JSONProcessor extends AbstractProcessor {
           ok = false;
           continue;
         }
+        String typeName = c.asType().toString();
+        boolean formatType = typeName.equals("java.time.LocalDate") || typeName.equals("java.time.LocalDateTime")
+            || typeName.equals("java.time.OffsetDateTime") || typeName.equals("java.time.ZonedDateTime")
+            || typeName.equals("java.time.Instant");
+        if (!policy.format().isEmpty()) {
+          if (!formatType) {
+            error(c, "@JSONField(format) on component [" + c.getSimpleName() + "] requires a LocalDate, LocalDateTime, "
+                + "OffsetDateTime, ZonedDateTime, or Instant type, not [" + typeName + "]");
+            ok = false;
+            continue;
+          }
+          if (policy.format().indexOf('"') >= 0 || policy.format().indexOf('\\') >= 0) {
+            error(c, "@JSONField(format) pattern [" + policy.format() + "] on component [" + c.getSimpleName()
+                + "] contains a quote or backslash");
+            ok = false;
+            continue;
+          }
+          try {
+            java.time.format.DateTimeFormatter.ofPattern(policy.format());
+          } catch (IllegalArgumentException iae) {
+            error(c, "@JSONField(format) pattern [" + policy.format() + "] on component [" + c.getSimpleName()
+                + "] is not a valid DateTimeFormatter pattern: " + iae.getMessage());
+            ok = false;
+            continue;
+          }
+        }
+        if (policy.instant() != InstantFormat.ISO) {
+          if (!typeName.equals("java.time.Instant")) {
+            error(c, "@JSONField(instant) on component [" + c.getSimpleName() + "] requires an Instant type, not ["
+                + typeName + "]");
+            ok = false;
+            continue;
+          }
+          if (!policy.format().isEmpty()) {
+            error(c, "@JSONField component [" + c.getSimpleName() + "] sets both instant and format (integer vs string)");
+            ok = false;
+            continue;
+          }
+        }
       }
       TypeView type = new TypeView(processingEnv, c.asType());
       if (type.isCollection()) {

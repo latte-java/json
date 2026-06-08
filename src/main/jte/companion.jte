@@ -31,6 +31,11 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 @for(Component c : view.components())
   private @template.declType(type = c.type()) ${c.name()};
 @endfor
+@for(Component c : view.components())
+@if(c.isFormatted())
+  private static final DateTimeFormatter ${c.formatterField()} = DateTimeFormatter.ofPattern("${c.format()}")@if(c.formatNeedsZone()).withZone(ZoneOffset.UTC)@endif;
+@endif
+@endfor
 
   public static String toJSON(${view.simpleName()} value) {
     return builder(value).build();
@@ -47,7 +52,11 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 @endif
 @for(Component c : view.components())
 @if(c.serialize())
-@if(c.type().isList() || c.type().isSet())
+@if(c.isFormatted())
+        .string("${c.wireKey()}", value.${c.name()}() == null ? null : ${c.formatterField()}.format(value.${c.name()}()))
+@elseif(c.isEpochInstant())
+        .integer("${c.wireKey()}", value.${c.name()}() == null ? null : value.${c.name()}().${c.epochMethod()}())
+@elseif(c.type().isList() || c.type().isSet())
         .array("${c.wireKey()}", value.${c.name()}() == null ? null : ${c.name()}ToJSON(value.${c.name()}()))
 @elseif(c.type().isMap())
         .object("${c.wireKey()}", value.${c.name()}() == null ? null : ${c.name()}ToJSON(value.${c.name()}()))
