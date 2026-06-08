@@ -434,7 +434,7 @@ Or, equivalently, a helper `Numbers.toByteExact(long)` / `Numbers.toShortExact(l
 
 - `char` / `Character` — JSON has no character type; mapping a one-character string is footgun-prone, and use cases that need a `char` are vanishingly rare. Compile-time error if used on an `@JSON` member.
 - `byte[]` — no native binary type in JSON. Avoids committing the library to a specific binary encoding (base64 vs. JSON-array-of-ints). Consumers with binary fields can use `String` plus their own encoding. Compile-time error if used on an `@JSON` member.
-- `Optional<T>` — JSON has only `null` and absent-key; mapping these onto `Optional.empty()` involves ambiguous semantics (is missing the same as null?) and round-tripping is contentious (serialize `Optional.empty()` as `null` or omit the key?). Required vs. optional semantics on a field are addressed via `@JSONField(required=…)` in §5 instead. Compile-time error if used on an `@JSON` member.
+- `Optional<T>` — JSON has only `null` and absent-key; mapping these onto `Optional.empty()` involves ambiguous semantics (is missing the same as null?) and round-tripping is contentious (serialize `Optional.empty()` as `null` or omit the key?). Compile-time error if used on an `@JSON` member.
 - `T[]` (arrays) — not idiomatic in modern Java DTOs; `List<T>` covers the same wire form. Compile-time error if used on an `@JSON` member.
 - `Map<K, V>` where `K` is not a supported string-form type (e.g. `Map<Integer, V>`, `Map<MyRecord, V>`). JSON object keys must be strings; integer-as-string-key conversion is a footgun and arbitrary objects have no canonical string form. Compile-time error if used on an `@JSON` member.
 
@@ -622,7 +622,7 @@ The polymorphic parent's `toJSON` (e.g., `PetJSON.toJSON(Pet)`) is a switch on t
 
 ## Field policies
 
-Default behavior aligns with OpenAPI 3.x semantics (fields not in `required` are optional, `additionalProperties` defaults to true). Per-field strictness is opt-in via `@JSONField(required=true)`; per-class strictness is opt-in via `@JSON(strict=true)`. Both annotations are specified in §5.
+Default behavior aligns with OpenAPI 3.x semantics (every field is optional, `additionalProperties` defaults to true). Per-class strictness is opt-in via `@JSON(strict=true)`, specified in §5. There is no per-field presence check — `required` was removed (see `docs/design/2026-06-07-jsonfield-policies-design.md`, "Dropped: `required`"); presence-checking is a caller concern.
 
 ### Missing JSON fields
 
@@ -630,9 +630,7 @@ A JSON object that omits a record component or class field is accepted by defaul
 
 - **Primitive field absent** — codegen leaves it at the Java default (`0` for numeric primitives, `false` for `boolean`). For records, this means the canonical constructor is invoked with the default value for any uninitialized primitive component.
 - **Reference field absent (`String`, `UUID`, nested record, list, etc.)** — codegen leaves it at `null`. For records, this means the canonical constructor receives `null` for that component.
-- **Collection field absent** — left at `null` (not an empty collection). Codegen does not silently substitute an empty list/set/map; users that prefer empty defaults can declare them on the record and use `@JSONField(required=false)` semantics.
-
-With `@JSONField(required=true)`, the codegen emits a `boolean fooSeen` flag in the observer, sets it in each relevant callback for that field, and checks all required flags at the top of `finish()`. Throws `JSONProcessingException` listing any unset required fields. Tracking machinery is only emitted for required fields — zero overhead for the common lenient case.
+- **Collection field absent** — left at `null` (not an empty collection). Codegen does not silently substitute an empty list/set/map; users that prefer empty defaults can declare them on the record.
 
 ### Unknown JSON fields
 
@@ -739,7 +737,7 @@ These observers are *not* singletons (unlike `SkipObserver`) — each instance a
 
 - `@JSONCatchAll` on a field whose type is not `Map<String, Object>` — exact type required.
 - More than one `@JSONCatchAll` on the same type.
-- `@JSONCatchAll` combined with `@JSONField(name=...)` or `@JSONField(required=true)` — the catch-all has no single key, so these don't apply.
+- `@JSONCatchAll` combined with `@JSONField(name=...)` — the catch-all has no single key, so this doesn't apply.
 
 ## Field naming and selection
 
@@ -831,10 +829,9 @@ public @interface JSONField {
 ### Compile-time errors
 
 - `readOnly = true` and `writeOnly = true` on the same `@JSONField` — equivalent to `ignore`, ambiguous.
-- `ignore = true` combined with `name`, `required`, `format`, `readOnly`, or `writeOnly` — the other attributes have no effect.
+- `ignore = true` combined with `name`, `format`, `readOnly`, or `writeOnly` — the other attributes have no effect.
 - `format` on a field whose type is not one of the `java.time` types.
 - `name` on a field annotated `@JSONCatchAll` — no single key applies to a catch-all map.
-- `required = true` on a field annotated `@JSONCatchAll` — the map itself is the catch-all.
 - `@JSONField` on a field annotated `@JSONCatchAll` if any attribute other than (no attributes) is set — same reasoning.
 - Two fields resolving to the same wire-form key after applying the naming strategy and per-field renames.
 
@@ -860,7 +857,7 @@ Every compile-time error case described elsewhere in this document follows the s
 - `@JSONTypeInfo` on a non-sealed type.
 - `@JSONSubtype` on a type not under an `@JSONTypeInfo` interface.
 - Duplicate discriminator values across subtypes; discriminator-key colliding with a field name.
-- Invalid `@JSONField` combinations (`readOnly`+`writeOnly`, `ignore` plus other attributes, `format` on a non-date type, `name` or `required` on a catch-all).
+- Invalid `@JSONField` combinations (`readOnly`+`writeOnly`, `ignore` plus other attributes, `format` on a non-date type, `name` on a catch-all).
 - `@JSONCatchAll` on the wrong field type, or more than one per type.
 - Two fields resolving to the same wire-form key after naming strategy and per-field renames are applied.
 - Cross-module `@JSON` references in record components or class fields.
@@ -883,7 +880,6 @@ Unknown discriminator value [Bird] for [petType] at path [$.users[3].pet]
 Value [99999999999999999999] out of range for [int] field [age] at path [$.users[0].age]
 Expected [string] but found [null] for primitive field [name] at path [$.profile.name]
 Duplicate JSON key [email] at path [$.users[2]]
-Required field [id] missing at path [$.products[0]]
 ```
 
 The path-tracking machinery adds one `ArrayDeque` allocation per `JSONParser.parse(...)` call and incurs no hot-path cost beyond `push` / `pop` on each begin/end of a container. Negligible for JWT and DTO payloads; small but acceptable for large documents.
@@ -947,7 +943,7 @@ All six annotations are introduced in context throughout the doc. Consolidated h
 | Annotation         | Target                               | Retention | Purpose                                                                                                          |
 |--------------------|--------------------------------------|-----------|------------------------------------------------------------------------------------------------------------------|
 | `@JSON`            | `TYPE`                               | `SOURCE`  | Marks a record, class, or sealed interface for JSON serialization. Attributes: `strict`, `naming`, `omitNulls`.  |
-| `@JSONField`       | `RECORD_COMPONENT`, `FIELD`          | `SOURCE`  | Per-field configuration: `name`, `required`, `ignore`, `format` (date types), `readOnly`, `writeOnly`.           |
+| `@JSONField`       | `RECORD_COMPONENT`, `FIELD`          | `SOURCE`  | Per-field configuration: `name`, `ignore`, `format` (date types), `readOnly`, `writeOnly`.                      |
 | `@JSONTypeInfo`    | `TYPE` (sealed interfaces only)      | `SOURCE`  | Declares a sealed type polymorphic. Attribute: `property` (discriminator key name; required).                    |
 | `@JSONSubtype`     | `TYPE` (subtypes of `@JSONTypeInfo`) | `SOURCE`  | Sets the discriminator value for this subtype. Attribute: `value` (defaults to simple class name).               |
 | `@JSONConstructor` | `CONSTRUCTOR` (non-record classes)   | `SOURCE`  | Marks the constructor the processor should use for deserialization. Parameter names define the JSON-key mapping. |
@@ -971,7 +967,7 @@ Decisions that still need to be made before this design is implementable. Ordere
 ### 2. Type coverage
 
 - [x] **Baseline.** `boolean`, `byte`, `short`, `int`, `long`, `float`, `double` (and their boxed forms), `String`, `BigInteger`, `BigDecimal`, records/classes annotated `@JSON`, `List<E>` where `E` is supported. `char` / `Character` and `byte[]` are explicitly out — JSON has no character type and no binary type, and the library declines to pick a binary encoding for users. Unsupported types fail at compile time via `Messager.printMessage(ERROR, ...)`. See the "Type coverage" section above for the full table.
-- [x] **Common extras.** In: any `enum` type (string form via `name()` / `valueOf`); `UUID` (ISO 8-4-4-4-12); `Instant`, `LocalDate`, `LocalDateTime`, `OffsetDateTime`, `ZonedDateTime`, `Duration`, `Period` (each via its built-in ISO-8601 `parse` / `toString`). Out: `Optional<T>` — required vs. optional semantics are handled via `@JSONField(required=…)` in §5 instead of through a wrapper type.
+- [x] **Common extras.** In: any `enum` type (string form via `name()` / `valueOf`); `UUID` (ISO 8-4-4-4-12); `Instant`, `LocalDate`, `LocalDateTime`, `OffsetDateTime`, `ZonedDateTime`, `Duration`, `Period` (each via its built-in ISO-8601 `parse` / `toString`). Out: `Optional<T>` — unsupported (ambiguous null/absent-key semantics and contentious round-tripping); presence-checking is a caller concern.
 - [x] **Classes vs. records.** Deserialization tiers: record canonical constructor → `@JSONConstructor`-marked constructor on a class (parameter names from `VariableElement.getSimpleName()`) → public no-arg constructor plus per-field setter (`setFoo`) → public field. Serialization tiers: record accessor → `getFoo()` → `isFoo()` (boolean only) → `foo()` → public field. New `@JSONConstructor` annotation (`@Target(CONSTRUCTOR)`, `@Retention(SOURCE)`). Compile-time errors for: no usable constructor, no usable writer or reader per field, `@JSONConstructor` on a record, multiple `@JSONConstructor` on one class. Fluent setters out of scope for v1. See the "Construction and access strategy" subsection.
 - [x] **Polymorphism.** Full OpenAPI-style polymorphism for sealed interfaces. New annotations `@JSONTypeInfo(property=...)` on the sealed type and `@JSONSubtype(value=...)` on each permitted subtype (defaulting to simple class name). New `JSONPolymorphicObserver<T>` interface returned from parent `beginObject(key)`. Parser implements two-pass-on-the-substring: save position, scan-ahead for the discriminator key, rewind, parse normally with the chosen child observer. Works at root, as a field, as a list element, as a map value (when maps land in §3), and arbitrarily nested. Each subtype's `toJSON` emits the discriminator pair as the first key. Compile-time errors for: `@JSONTypeInfo` on non-sealed types, subtypes missing `@JSON`, duplicate discriminator values, discriminator-key/field-name collision. See the "Polymorphism" section.
 
@@ -989,12 +985,12 @@ Decisions that still need to be made before this design is implementable. Ordere
 - [x] **JSON `null` for a primitive field.** Always throws `JSONProcessingException`, regardless of strictness mode. No coercion is defensible. Codegen emits a throwing `case "foo" -> throw ...` arm in `nullValue(String key)` for every primitive field.
 - [x] **Unknown JSON fields.** Lenient default — silently dropped via shared `SkipObserver` / `SkipArrayObserver` singletons in the helper code. Codegen emits `default -> SkipObserver.INSTANCE` in the parent's `beginObject` switch (and analogous for arrays). With `@JSON(strict=true)`, codegen swaps every `default` arm to `throw new JSONProcessingException("Unknown JSON key [...] for type [...]")`.
 - [x] **Numeric width mismatch.** Always throws at runtime via the `Math.toIntExact` / `intValueExact` calls the codegen already emits during narrowing. Single global policy; not configurable — silent truncation is never the right answer.
-- [x] **Catch-all for unknown fields.** New `@JSONCatchAll` annotation, applied to exactly one `Map<String, Object>` field on a record or class. Unknown JSON keys are captured into that map at their natural Java shape (`String`, `Long`, `BigInteger`, `BigDecimal`, `Boolean`, `null`, `LinkedHashMap<String, Object>`, `ArrayList<Object>`). Two new helper observers in the shared helper code (`AnyObjectObserver`, `AnyArrayObserver`) drive nested unknown structures. Catch-all overrides `@JSON(strict=true)`. Compile-time errors for wrong type, multiple catch-alls per type, or combining with `@JSONField(name=...)` / `@JSONField(required=true)`. See "Catch-all for unknown fields" above.
+- [x] **Catch-all for unknown fields.** New `@JSONCatchAll` annotation, applied to exactly one `Map<String, Object>` field on a record or class. Unknown JSON keys are captured into that map at their natural Java shape (`String`, `Long`, `BigInteger`, `BigDecimal`, `Boolean`, `null`, `LinkedHashMap<String, Object>`, `ArrayList<Object>`). Two new helper observers in the shared helper code (`AnyObjectObserver`, `AnyArrayObserver`) drive nested unknown structures. Catch-all overrides `@JSON(strict=true)`. Compile-time errors for wrong type, multiple catch-alls per type, or combining with `@JSONField(name=...)`. See "Catch-all for unknown fields" above.
 
 ### 5. Field naming and selection
 
 - [x] **Naming strategy.** Identity by default. Per-class override via `@JSON(naming = NamingStrategy.X)` where `X` is `IDENTITY`, `CAMEL_CASE`, `SNAKE_CASE`, `PASCAL_CASE`, or `KEBAB_CASE`. Per-field override via `@JSONField(name = "...")`. Strategy applied at compile time — codegen bakes the resulting wire key as a string literal into the generated switch arms. Zero runtime cost. See "Naming strategy" above.
-- [x] **Per-field overrides.** New `@JSONField` annotation on record components and class fields. Attributes: `name`, `required`, `ignore`, `format` (date types only), `readOnly`, `writeOnly`. Compile-time errors for `readOnly`+`writeOnly` together, `ignore` plus any other attribute, `format` on a non-date type, and a handful of `@JSONCatchAll` interaction rules. See "The `@JSONField` annotation" above.
+- [x] **Per-field overrides.** New `@JSONField` annotation on record components and class fields. Attributes: `name`, `ignore`, `format` (date types only), `readOnly`, `writeOnly`. Compile-time errors for `readOnly`+`writeOnly` together, `ignore` plus any other attribute, `format` on a non-date type, and a handful of `@JSONCatchAll` interaction rules. See "The `@JSONField` annotation" above.
 - [x] **Read-only / write-only fields.** Supported via `@JSONField(readOnly = true)` and `@JSONField(writeOnly = true)`. Vocabulary matches OpenAPI exactly: `readOnly` means serialize-only on the Java side (server-to-client), `writeOnly` means deserialize-only (client-to-server). Codegen handles this field in only the matching direction.
 
 ### 6. Serialization output
