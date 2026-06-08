@@ -37,4 +37,12 @@ public class PolicyRejectionTest {
   @Test public void instantPlusFormatRejected() throws Exception {
     assertFailsWith("badpolicy_instantformat", "instant and format", "[both]");
   }
+
+  @Test public void invalidFormatPatternRejected() throws Exception {
+    assertFailsWith("badpolicy_badpattern", "not a valid DateTimeFormatter pattern", "[d]");
+  }
+
+  @Test public void formatPatternWithQuoteRejected() throws Exception {
+    assertFailsWith("badpolicy_badpatternchar", "quote or backslash", "[d]");
+  }
 }
