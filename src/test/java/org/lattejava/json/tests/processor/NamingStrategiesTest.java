@@ -45,4 +45,12 @@ public class NamingStrategiesTest {
     assertEquals(NamingStrategies.apply(NamingStrategy.CAMEL_CASE, "userID"), "userId");
     assertEquals(NamingStrategies.apply(NamingStrategy.CAMEL_CASE, "HTTPStatus"), "httpStatus");
   }
+
+  @Test
+  public void defensiveEdges() {
+    assertEquals(NamingStrategies.apply(NamingStrategy.SNAKE_CASE, ""), "");
+    assertEquals(NamingStrategies.apply(NamingStrategy.SNAKE_CASE, "URL"), "url");
+    assertEquals(NamingStrategies.apply(NamingStrategy.PASCAL_CASE, "URL"), "Url");
+    assertEquals(NamingStrategies.apply(NamingStrategy.CAMEL_CASE, "IDToken"), "idToken");
+  }
 }
