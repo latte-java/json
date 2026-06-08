@@ -19,10 +19,10 @@ public class PolicyRejectionTest {
   }
 
   @Test public void readOnlyWriteOnlyConflictRejected() throws Exception {
-    assertFailsWith("badpolicy_rwconflict", "readOnly and writeOnly", "x");
+    assertFailsWith("badpolicy_rwconflict", "readOnly and writeOnly", "[x]");
   }
 
   @Test public void ignorePlusOtherRejected() throws Exception {
-    assertFailsWith("badpolicy_ignoreplus", "ignore", "value");
+    assertFailsWith("badpolicy_ignoreplus", "ignore", "[value]");
   }
 }
