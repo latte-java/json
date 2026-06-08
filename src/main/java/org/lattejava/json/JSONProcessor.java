@@ -381,7 +381,7 @@ public final class JSONProcessor extends AbstractProcessor {
             continue;
           }
           try {
-            java.time.format.DateTimeFormatter.ofPattern(policy.format());
+            DateTimeFormatter.ofPattern(policy.format());
           } catch (IllegalArgumentException iae) {
             error(c, "@JSONField(format) pattern [" + policy.format() + "] on component [" + c.getSimpleName()
                 + "] is not a valid DateTimeFormatter pattern: " + iae.getMessage());

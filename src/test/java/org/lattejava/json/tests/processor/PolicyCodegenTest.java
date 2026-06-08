@@ -75,4 +75,16 @@ public class PolicyCodegenTest {
       assertTrue(json.contains("\"seconds\":2"), "epoch seconds must be a bare integer, got: " + json);
     }
   }
+
+  @Test
+  public void formatOnInstantUsesZonedFormatter() throws Exception {
+    try (var loader = (URLClassLoader) policies.loader()) {
+      Class<?> t = loader.loadClass("demo.Stamped");
+      Class<?> j = loader.loadClass("demo.internal.StampedJSON");
+      String json = "{\"at\":\"2026-03-14T09:26:53Z\"}";
+      Object o = j.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(t.getMethod("at").invoke(o), java.time.Instant.parse("2026-03-14T09:26:53Z"));
+      assertEquals(j.getMethod("toJSON", t).invoke(null, o), json);
+    }
+  }
 }
