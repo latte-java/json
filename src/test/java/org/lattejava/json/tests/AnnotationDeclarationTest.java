@@ -25,8 +25,8 @@ public class AnnotationDeclarationTest {
     assertEquals(ann.getDeclaredMethod("format").getDefaultValue(), "");
     assertEquals(ann.getDeclaredMethod("ignore").getDefaultValue(), Boolean.FALSE);
     assertEquals(ann.getDeclaredMethod("name").getDefaultValue(), "");
+    assertEquals(ann.getDeclaredMethod("instant").getDefaultValue(), InstantFormat.ISO);
     assertEquals(ann.getDeclaredMethod("readOnly").getDefaultValue(), Boolean.FALSE);
-    assertEquals(ann.getDeclaredMethod("required").getDefaultValue(), Boolean.FALSE);
     assertEquals(ann.getDeclaredMethod("writeOnly").getDefaultValue(), Boolean.FALSE);
   }
 

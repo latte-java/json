@@ -808,7 +808,7 @@ import java.lang.annotation.*;
 @Target({ElementType.RECORD_COMPONENT, ElementType.FIELD})
 public @interface JSONField {
   String name() default "";          // wire-form override; "" = strategy-derived from Java name
-  boolean required() default false;  // throw on missing during deserialization
+  InstantFormat instant() default InstantFormat.ISO;  // epoch-integer Instant representation
   boolean ignore() default false;    // skip both serialization and deserialization
   String format() default "";        // custom format for java.time fields (DateTimeFormatter pattern)
   boolean readOnly() default false;  // serialize only (OpenAPI vocabulary)
@@ -818,7 +818,7 @@ public @interface JSONField {
 
 **`name`** — overrides the wire-form key for this one field. Useful for keys that are reserved Java identifiers, contain hyphens, or otherwise can't match the field name through any strategy.
 
-**`required`** — codegen tracks whether the field was set during a parse (boolean `seen` flag, set in each callback that handles this field), and `finish()` throws if any required field was unset. Tracking machinery is only emitted for required fields.
+**`required`** — removed (see `docs/design/2026-06-07-jsonfield-policies-design.md`, "Dropped: `required`"). Presence-checking is a caller concern; a missing field keeps the lenient default (primitives at their Java default, references `null`).
 
 **`ignore`** — codegen omits this field from both `toJSON` (no serialization) and the observer (no callback handling). The field still exists on the Java side; it's just invisible to JSON. Useful for derived fields, computed values, or sensitive data.
 
@@ -984,8 +984,8 @@ Decisions that still need to be made before this design is implementable. Ordere
 
 ### 4. Field policies
 
-- [x] **Missing JSON field for a primitive.** Lenient default — codegen leaves the field at its Java default (`0` / `0.0` / `false`). Per-field `@JSONField(required=true)` tightens to a throw, implemented via per-required-field `seen` flags checked at `finish()`. See "Field policies" above.
-- [x] **Missing JSON field for a reference.** Lenient default — `null` (including for `List`, `Set`, `Map` — no silent empty-collection substitution). Per-field `@JSONField(required=true)` tightens to a throw.
+- [x] **Missing JSON field for a primitive.** Lenient default — codegen leaves the field at its Java default (`0` / `0.0` / `false`). (`required` was removed — see `docs/design/2026-06-07-jsonfield-policies-design.md`, "Dropped: `required`"; presence-checking is a caller concern.)
+- [x] **Missing JSON field for a reference.** Lenient default — `null` (including for `List`, `Set`, `Map` — no silent empty-collection substitution). (`required` was removed — see `docs/design/2026-06-07-jsonfield-policies-design.md`.)
 - [x] **JSON `null` for a primitive field.** Always throws `JSONProcessingException`, regardless of strictness mode. No coercion is defensible. Codegen emits a throwing `case "foo" -> throw ...` arm in `nullValue(String key)` for every primitive field.
 - [x] **Unknown JSON fields.** Lenient default — silently dropped via shared `SkipObserver` / `SkipArrayObserver` singletons in the helper code. Codegen emits `default -> SkipObserver.INSTANCE` in the parent's `beginObject` switch (and analogous for arrays). With `@JSON(strict=true)`, codegen swaps every `default` arm to `throw new JSONProcessingException("Unknown JSON key [...] for type [...]")`.
 - [x] **Numeric width mismatch.** Always throws at runtime via the `Math.toIntExact` / `intValueExact` calls the codegen already emits during narrowing. Single global policy; not configurable — silent truncation is never the right answer.

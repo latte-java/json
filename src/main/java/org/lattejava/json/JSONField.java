@@ -7,9 +7,7 @@ package org.lattejava.json;
 import module java.base;
 
 /**
- * Per-field configuration for a record component or class field of an {@link JSON @JSON}-annotated type.
- * <p>
- * TODO: Not implemented yet.
+ * Per-field configuration for a record component of an {@link JSON @JSON}-annotated type.
  *
  * @author Brian Pontarelli
  */
@@ -20,11 +18,11 @@ public @interface JSONField {
 
   boolean ignore() default false;
 
+  InstantFormat instant() default InstantFormat.ISO;
+
   String name() default "";
 
   boolean readOnly() default false;
-
-  boolean required() default false;
 
   boolean writeOnly() default false;
 }
