@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2025-2026 The Latte Project
+ * Copyright (c) 2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
 package org.lattejava.json;
 
 /**
- * Thrown by {@link JSONProcessor} implementations when JSON serialization or deserialization fails. The
- * {@code JSONProcessor} interface itself declares this in its {@code throws} clause for documentation; the
- * encoder/decoder catch and propagate these directly.
+ * Runtime exception thrown by the JSON parser, builder, and generated companion classes on any parse or
+ * serialization failure. Messages wrap runtime values in {@code [brackets]} and include the JSON-path of
+ * the failure when known.
  *
- * @author Daniel DeGroff
+ * @author Brian Pontarelli
  */
 public class JSONProcessingException extends RuntimeException {
   public JSONProcessingException(String message) {
@@ -18,9 +18,5 @@ public class JSONProcessingException extends RuntimeException {
 
   public JSONProcessingException(String message, Throwable cause) {
     super(message, cause);
-  }
-
-  public JSONProcessingException(Throwable cause) {
-    super(cause == null ? null : cause.getMessage(), cause);
   }
 }

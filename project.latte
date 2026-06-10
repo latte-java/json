@@ -2,21 +2,22 @@
  * Copyright (c) 2025-2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
-project(group: "org.lattejava", name: "json", version: "0.1.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "json", version: "0.2.0", licenses: ["MIT"]) {
   workflow {
     standard()
   }
 
   publishWorkflow {
-    s3(endpoint: global.latteRepositoryS3URL, bucket: "latte-repository",
-        accessKeyId: global.latteRepositoryS3AccessKeyID, secretAccessKey: global.latteRepositoryS3SecretAccessKey)
+    latte()
   }
 
   dependencies {
     group(name: "compile") {
+      dependency(id: "gg.jte:jte:3.2.1")
+      dependency(id: "gg.jte:jte-runtime:3.2.1")
     }
     group(name: "test-compile", export: false) {
-      dependency(id: "org.testng:testng:7.10.2")
+      dependency(id: "org.testng:testng:7.12.0")
     }
   }
 
@@ -26,11 +27,12 @@ project(group: "org.lattejava", name: "json", version: "0.1.0", licenses: ["MIT"
 }
 
 // Plugins
-dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.5")
-idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.5")
-java = loadPlugin(id: "org.lattejava.plugin:java:0.1.8")
-javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.1.8")
-release = loadPlugin(id: "org.lattejava.plugin:release-git:0.1.5")
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.4.0")
+file = loadPlugin(id: "org.lattejava.plugin:file:0.4.0")
+idea = loadPlugin(id: "org.lattejava.plugin:idea:0.4.0")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.4.0")
+javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.4.0")
+release = loadPlugin(id: "org.lattejava.plugin:release-git:0.4.0")
 
 // Plugin settings
 java.settings.javaVersion = "25"
@@ -41,7 +43,23 @@ target(name: "clean", description: "Cleans the project") {
 }
 
 target(name: "build", description: "Compiles and JARs the project") {
-  java.compile()
+  java.compileMain()
+  // Precompile the JTE templates (src/main/jte/*.jte) into build/classes/main under
+  // org.lattejava.json.jte.generated, so the precompiled classes are baked into the jar. Runs the
+  // just-compiled Generate main off the exploded classes dir (the jar does not exist yet) plus the
+  // build-time jte compiler/runtime from the compile group.
+  java.run(
+      main: "org.lattejava.json.jte.Generate",
+      jvmArguments: "--add-modules gg.jte",
+      additionalClasspath: ["build/classes/main"],
+      dependencies: [[group: "compile", transitive: true, fetchSource: false, transitiveGroups: ["compile", "runtime"]]]
+  )
+  java.compileTest()
+  file.copy(to: "build/classes/main/org/lattejava/json/internal") {
+    fileSet(dir: "src/main/java/org/lattejava/json/",
+        includePatterns: [/Any.*/, /Conversion.*/, /JSON.*/, /Numbers.*/, /Skip.*/],
+        excludePatterns: [/JSON.java/, /JSONCatchAll.java/, /JSONConstructor.java/, /JSONField.java/, /JSONProcessor.java/, /JSONSubtype.java/, /JSONTypeInfo.java/])
+  }
   java.jar()
 }
 

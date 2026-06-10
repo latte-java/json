@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2026 The Latte Project
+ * SPDX-License-Identifier: MIT
+ */
+package org.lattejava.json.tests.processor;
+
+import module java.base;
+import module org.testng;
+
+import java.nio.file.Files;
+
+import static org.testng.Assert.*;
+
+public class ScaffoldingIndentationTest {
+  @Test
+  public void observerMethodsAndCaseArmsAreNotOverIndented() throws Exception {
+    var result = ProcessorHarness.compile("simple");
+    assertTrue(result.success(), "fixture must compile: " + result.diagnostics());
+
+    Path companion;
+    try (var walk = Files.walk(result.outputDir())) {
+      companion = walk.filter(p -> p.getFileName().toString().endsWith("JSON.java"))
+                      .filter(p -> !p.getFileName().toString().equals("JSONProcessor.java"))
+                      .findFirst()
+                      .orElseThrow(() -> new AssertionError("no generated *JSON.java companion found"));
+    }
+    String src = Files.readString(companion, StandardCharsets.UTF_8);
+
+    // Observer callbacks are class members: exactly 2-space indent, switch at 4, case at 6.
+    assertTrue(src.contains("\n  @Override public void string(String key, String value) {\n"),
+        "string(...) observer must be at 2-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n    switch (key) {\n"),
+        "switch must be at 4-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n  @Override public void nullValue(String key) {\n"),
+        "non-first observer (nullValue) must be at 2-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n      case "),
+        "case arms must be at 6-space indent; companion was:\n" + src);
+    assertTrue(src.contains("\n  @Override public ") && src.contains(" finish() {\n"),
+        "finish() must be a 2-space member; companion was:\n" + src);
+    // Guards against the body-block over-indentation regression: every observer method is a
+    // 2-space class member, so its @Override signature must never appear at a 4-space indent.
+    assertFalse(src.contains("\n    @Override public void string(String key, String value) {\n"),
+        "string(...) observer is over-indented (4 spaces); companion was:\n" + src);
+  }
+
+  @Test
+  public void collectionObserverClassesAreCorrectlyIndented() throws Exception {
+    var result = ProcessorHarness.compile("collections");
+    assertTrue(result.success(), "collections fixture must compile: " + result.diagnostics());
+    Path companion;
+    try (var walk = Files.walk(result.outputDir())) {
+      companion = walk.filter(p -> p.getFileName().toString().endsWith("JSON.java"))
+                      .filter(p -> !p.getFileName().toString().equals("JSONProcessor.java"))
+                      .findFirst().orElseThrow(() -> new AssertionError("no companion"));
+    }
+    String src = Files.readString(companion, StandardCharsets.UTF_8);
+    assertTrue(src.contains("\n  private static final class "),
+        "inner observer class must be a 2-space member; was:\n" + src);
+    assertTrue(src.contains("\n  private static String "),
+        "collection serializer must be a 2-space member; was:\n" + src);
+    assertFalse(src.contains("\n    private static final class "),
+        "inner observer class must not be over-indented; was:\n" + src);
+  }
+}

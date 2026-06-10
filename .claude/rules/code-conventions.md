@@ -132,6 +132,12 @@ Inside a class, the order should always be:
 - Enum constants (ordered alphabetically)
 - Nested classes (ordered alphabetically)
 
+## Syntax to avoid
+
+Avoid this syntax whenever possible:
+
+* Nested ternary operators (e.g., `bool ? anotherBool ? value1 : value2 : value3`)
+
 ## Javadoc
 
 When Javadoc is written, use sentence structure, punctuation, and capitalization of common American English publications. This rule applies to @param, @return, @throws, and the main comment block.
