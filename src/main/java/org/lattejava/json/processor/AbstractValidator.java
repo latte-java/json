@@ -169,6 +169,10 @@ public abstract class AbstractValidator {
               + (k == null ? "?" : k.name()) + "] (Map key must be String, UUID, an enum, or a java.time type)");
           return false;
         }
+        // dynamic map: Map<String, Object> carries arbitrary JSON values, read/written via the Any* helpers
+        if (k.isString() && v != null && v.isObject()) {
+          return true;
+        }
         if (v == null || v.isCollection()) {
           error(at, "@JSON member [" + name + "] uses a nested collection as a Map value ["
               + (v == null ? "?" : v.name()) + "] which is not supported in this release");

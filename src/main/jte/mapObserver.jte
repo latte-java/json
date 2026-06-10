@@ -1,6 +1,13 @@
 @import org.lattejava.json.jte.Component
 @param Component c
 @param boolean omitNulls
+@if(c.type().isDynamicMap())
+  private static String ${c.name()}ToJSON(@template.declType(type = c.type()) v) {
+    var b = new JSONBuilder(${omitNulls});
+    for (var en : v.entrySet()) b.any(en.getKey(), en.getValue());
+    return b.build();
+  }
+@else
 !{var keyType = c.type().key();}
 !{var valType = c.type().value();}
 !{var mapKey = keyType.isEnum() ? "en.getKey().name()" : keyType.isString() ? "en.getKey()" : "en.getKey().toString()";}
@@ -51,3 +58,4 @@
     @Override public void array(String key, Object value) {}
 @endif
   }
+@endif

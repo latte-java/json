@@ -73,7 +73,9 @@
   @Override public JSONObjectHandler beginObject(String key) {
     switch (key) {
 @for(Component c : view.typedComponents())
-@if(c.deserialize() && c.type().isMap())
+@if(c.deserialize() && c.type().isDynamicMap())
+      case "${c.wireKey()}" -> { return new AnyObjectObserver(); }
+@elseif(c.deserialize() && c.type().isMap())
       case "${c.wireKey()}" -> { return new @template.cap(name = c.name())MapObserver(); }
 @elseif(c.deserialize() && c.type().hasCompanion())
       case "${c.wireKey()}" -> { return new ${c.type().nestedCompanion()}(); }

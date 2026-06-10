@@ -9,7 +9,7 @@ package ${view.companionPackage()};
 
 import module java.base;
 import ${view.qualifiedType()};
-@if(!view.catchAll().isEmpty())
+@if(!view.catchAll().isEmpty() || view.hasDynamicMap())
 import ${view.internalPackage()}.AnyArrayObserver;
 import ${view.internalPackage()}.AnyObjectObserver;
 @endif

@@ -1,7 +1,7 @@
 # Dynamic `Map<String, Object>` fields (arbitrary JSON values)
 
 **Date:** 2026-06-10
-**Status:** Draft (design); pending user review
+**Status:** Implemented
 **Scope:** Annotation-processor codegen only — recognize a *named* (non-`@JSONCatchAll`) record/class member typed `Map<String, Object>` as a "dynamic map": an arbitrary JSON object nested under the member's own wire key. Deserialize reuses the existing `AnyObjectObserver`/`AnyArrayObserver` runtime; serialize reuses the existing `JSONBuilder.any(String, Object)` writer. **No new runtime code, no public API change, no `module-info` change.**
 
 ## Problem

@@ -65,6 +65,14 @@ public final class TypeView {
     return !kind().isEmpty();
   }
 
+  /**
+   * Whether this type is a dynamic map — {@code Map<String, Object>} — whose values are arbitrary JSON captured at
+   * their natural Java shapes. Read through {@code AnyObjectObserver}, written through {@code JSONBuilder.any}.
+   */
+  public boolean isDynamicMap() {
+    return isMap() && key() != null && key().isString() && value() != null && value().isObject();
+  }
+
   public boolean isEnum() {
     return type.getKind() == TypeKind.DECLARED
         && ((javax.lang.model.type.DeclaredType) type).asElement().getKind() == ElementKind.ENUM;
@@ -94,6 +102,11 @@ public final class TypeView {
 
   public boolean isNumeric() {
     return NUMERIC.contains(name());
+  }
+
+  /** Whether this type is exactly {@code java.lang.Object}. */
+  public boolean isObject() {
+    return name().equals("java.lang.Object");
   }
 
   /**

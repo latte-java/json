@@ -89,6 +89,11 @@ public final class CompanionView {
     return enumImports;
   }
 
+  /** Whether any non-catch-all member is a dynamic {@code Map<String, Object>} (gates the {@code Any*Observer} imports). */
+  public boolean hasDynamicMap() {
+    return components.stream().anyMatch(c -> c.type().isDynamicMap());
+  }
+
   public String internalPackage() {
     return internalPackage;
   }
