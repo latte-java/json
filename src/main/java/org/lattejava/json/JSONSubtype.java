@@ -9,8 +9,6 @@ import module java.base;
 /**
  * Sets the discriminator value for a subtype of an {@link JSONTypeInfo @JSONTypeInfo} hierarchy. Defaults
  * to the simple class name when {@link #value()} is empty.
- * <p>
- * TODO: Not implemented yet.
  *
  * @author Brian Pontarelli
  */
