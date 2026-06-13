@@ -34,11 +34,19 @@ public final class TypeView {
   }
 
   /**
-   * The reference form to write for this type in generated source: the fully-qualified name for a type with a
-   * generated companion (a nested {@code @JSON} record or a polymorphic {@code @JSON} interface), so no import is
-   * needed and same-simple-name collisions cannot occur, else the simple name.
+   * The reference form to write for this type in generated source: for a collection, the full generic
+   * declaration built recursively (e.g. {@code Map<String, List<demo.Product>>}); for a type with a
+   * generated companion (a nested {@code @JSON} record/class or a polymorphic {@code @JSON} interface),
+   * the fully-qualified name, so no import is needed and same-simple-name collisions cannot occur; else
+   * the simple name.
    */
   public String decl() {
+    if (isMap()) {
+      return "Map<" + key().decl() + ", " + value().decl() + ">";
+    }
+    if (isCollection()) {
+      return kind() + "<" + element().decl() + ">";
+    }
     return hasCompanion() ? name() : simpleName();
   }
 

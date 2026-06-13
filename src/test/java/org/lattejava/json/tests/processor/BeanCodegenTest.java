@@ -32,6 +32,18 @@ public class BeanCodegenTest {
   }
 
   @Test
+  public void beanListPropertyRoundTrips() throws Exception {
+    try (var loader = (URLClassLoader) beans.loader()) {
+      Class<?> t = loader.loadClass("demo.Account");
+      Class<?> j = loader.loadClass("demo.internal.AccountJSON");
+      String json = "{\"id\":\"a\",\"balance\":5,\"aliases\":[\"x\",\"y\"],\"feeBps\":25}";
+      Object o = j.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(t.getMethod("getAliases").invoke(o), java.util.List.of("x", "y"));
+      assertEquals(j.getMethod("toJSON", t).invoke(null, o), json);
+    }
+  }
+
+  @Test
   public void publicFieldsRoundTrip() throws Exception {
     try (var loader = (URLClassLoader) beans.loader()) {
       Class<?> t = loader.loadClass("demo.PublicFields");

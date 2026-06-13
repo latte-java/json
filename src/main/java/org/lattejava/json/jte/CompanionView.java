@@ -94,6 +94,11 @@ public final class CompanionView {
     return components.stream().anyMatch(c -> c.type().isDynamicMap());
   }
 
+  /** Whether any member uses a typed collection plan (a non-dynamic-map collection member). */
+  public boolean hasPlan() {
+    return components.stream().anyMatch(c -> c.type().isCollection() && !c.isCatchAll() && !c.type().isDynamicMap());
+  }
+
   public String internalPackage() {
     return internalPackage;
   }

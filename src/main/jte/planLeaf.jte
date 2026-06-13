@@ -1,0 +1,3 @@
+@import org.lattejava.json.jte.TypeView
+@param TypeView type
+!{var numeric = !type.isStringForm() && !type.isBool();}JSONPlan.<@template.declType(type = type)>scalar("${type.name()}", @if(type.isStringForm())value -> @template.fromString(type = type, expr = "value")@elsenull@endif, @if(numeric)value -> @template.narrow(type = type, source = "integer")@elsenull@endif, @if(numeric)value -> @template.narrow(type = type, source = "bigInteger")@elsenull@endif, @if(numeric)value -> @template.narrow(type = type, source = "decimal")@elsenull@endif, ${type.isBool()}, (b, e) -> b@template.arrayAppend(type = type, expr = "e"), (b, k, e) -> b.@template.memberCall(type = type, key = "k", val = "e"))

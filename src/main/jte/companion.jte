@@ -13,6 +13,11 @@ import ${view.qualifiedType()};
 import ${view.internalPackage()}.AnyArrayObserver;
 import ${view.internalPackage()}.AnyObjectObserver;
 @endif
+@if(view.hasPlan())
+import ${view.internalPackage()}.JSONPlan;
+import ${view.internalPackage()}.JSONPlanArrayObserver;
+import ${view.internalPackage()}.JSONPlanMapObserver;
+@endif
 import ${view.internalPackage()}.Conversions;
 import ${view.internalPackage()}.JSONArrayBuilder;
 import ${view.internalPackage()}.JSONArrayObserver;
@@ -22,6 +27,10 @@ import ${view.internalPackage()}.JSONObserver;
 import ${view.internalPackage()}.JSONParser;
 import ${view.internalPackage()}.JSONProcessingException;
 import ${view.internalPackage()}.Numbers;
+@if(view.catchAll().isEmpty() && !view.strict())
+import ${view.internalPackage()}.SkipArrayObserver;
+import ${view.internalPackage()}.SkipObserver;
+@endif
 @for(String imp : view.enumImports())
 import ${imp};
 @endfor
@@ -38,6 +47,11 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 @for(Component c : view.components())
 @if(c.isFormatted())
   private static final DateTimeFormatter ${c.formatterField()} = DateTimeFormatter.ofPattern("${c.format()}")@if(c.formatNeedsZone()).withZone(ZoneOffset.UTC)@endif;
+@endif
+@endfor
+@for(Component c : view.collectionComponents())
+@if(!c.type().isDynamicMap())
+@template.plan(c = c)
 @endif
 @endfor
 
@@ -61,9 +75,11 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 @elseif(c.isEpochInstant())
         .integer("${c.wireKey()}", value.${c.read()} == null ? null : value.${c.read()}.${c.epochMethod()}())
 @elseif(c.type().isList() || c.type().isSet())
-        .array("${c.wireKey()}", value.${c.read()} == null ? null : ${c.name()}ToJSON(value.${c.read()}))
-@elseif(c.type().isMap())
+        .array("${c.wireKey()}", value.${c.read()} == null ? null : JSONPlan.write(${c.name()}$plan, value.${c.read()}, ${view.omitNulls()}))
+@elseif(c.type().isDynamicMap())
         .object("${c.wireKey()}", value.${c.read()} == null ? null : ${c.name()}ToJSON(value.${c.read()}))
+@elseif(c.type().isMap())
+        .object("${c.wireKey()}", value.${c.read()} == null ? null : JSONPlan.write(${c.name()}$plan, value.${c.read()}, ${view.omitNulls()}))
 @else
         .@template.memberCall(type = c.type(), key = "\"" + c.wireKey() + "\"", val = "value." + c.read())
 @endif
@@ -89,10 +105,8 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
   }
 
 @for(Component c : view.collectionComponents())
-@if(c.type().isMap())
-@template.mapObserver(c = c, omitNulls = view.omitNulls())
-@else
-@template.arrayObserver(c = c)
+@if(c.type().isDynamicMap())
+@template.dynamicMap(c = c, omitNulls = view.omitNulls())
 @endif
 @endfor
 @template.observerBody(view = view)

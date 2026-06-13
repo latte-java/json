@@ -1,0 +1,3 @@
+@import org.lattejava.json.jte.TypeView
+@param TypeView type
+@if(type.isMap())JSONPlan.map(@template.planKeyReader(type = type.key()), @template.planKeyWriter(type = type.key()), @template.planNode(type = type.value()))@elseif(type.isSet())JSONPlan.set(@template.planNode(type = type.element()))@elseif(type.isList())JSONPlan.list(@template.planNode(type = type.element()))@elseif(type.hasCompanion())JSONPlan.object("${type.name()}", ${type.nestedCompanion()}::new, ${type.nestedCompanion()}::toJSON)@else@template.planLeaf(type = type)@endif

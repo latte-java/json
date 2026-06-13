@@ -29,6 +29,10 @@ Use the `--test` flag on the `test` target:
 latte test --test=JSONProcessorTest
 ```
 
+## Git worktrees
+
+Create all git worktrees inside the project directory under `.worktrees/` (e.g. `git worktree add .worktrees/<branch-name> <branch>`). Never create worktrees in the home directory or anywhere else outside the repo.
+
 ## Architecture
 
 This module publishes one public class plus its exception:

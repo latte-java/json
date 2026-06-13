@@ -60,6 +60,20 @@ public class MapCodegenTest {
   }
 
   @Test
+  public void roundTripsBooleanValueMap() throws Exception {
+    try (var loader = (URLClassLoader) coll.loader()) {
+      Class<?> maps = loader.loadClass("demo.Maps");
+      Class<?> mapsJson = loader.loadClass("demo.internal.MapsJSON");
+      String json = "{\"counts\":{},\"labels\":{},\"toggles\":{\"on\":true,\"off\":false}}";
+      Object o = mapsJson.getMethod("fromJSON", String.class).invoke(null, json);
+      var toggles = (java.util.Map<?, ?>) maps.getMethod("toggles").invoke(o);
+      assertEquals(toggles.get("on"), Boolean.TRUE);
+      assertEquals(toggles.get("off"), Boolean.FALSE);
+      assertEquals(mapsJson.getMethod("toJSON", maps).invoke(null, o), json);
+    }
+  }
+
+  @Test
   public void roundTripsEnumKeyMap() throws Exception {
     try (var loader = (URLClassLoader) coll.loader()) {
       Class<?> keyedMaps = loader.loadClass("demo.KeyedMaps");

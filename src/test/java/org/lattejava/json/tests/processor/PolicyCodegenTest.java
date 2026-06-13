@@ -39,10 +39,27 @@ public class PolicyCodegenTest {
     try (var loader = (URLClassLoader) policies.loader()) {
       Class<?> t = loader.loadClass("demo.Directions");
       Class<?> j = loader.loadClass("demo.internal.DirectionsJSON");
-      Object o = t.getConstructor(String.class, String.class, String.class, String.class)
-          .newInstance("b", "r", "w", "i");
-      // readOnly IS serialized; writeOnly and ignored are NOT.
+      Object o = t.getConstructor(String.class, String.class, String.class, String.class, java.util.List.class)
+          .newInstance("b", "r", "w", "i", null);
+      // readOnly IS serialized; writeOnly and ignored are NOT; null tags list is omitted.
       assertEquals(j.getMethod("toJSON", t).invoke(null, o), "{\"both\":\"b\",\"readOnly\":\"r\"}");
+    }
+  }
+
+  @Test
+  public void readOnlyListSerializedNotDeserialized() throws Exception {
+    try (var loader = (URLClassLoader) policies.loader()) {
+      Class<?> t = loader.loadClass("demo.Directions");
+      Class<?> j = loader.loadClass("demo.internal.DirectionsJSON");
+      // readOnly gates collection members the same way as scalars: serialized, never read from input.
+      Object o = j.getMethod("fromJSON", String.class)
+          .invoke(null, "{\"both\":\"b\",\"tags\":[\"a\",\"b\"]}");
+      assertEquals(t.getMethod("both").invoke(o), "b");
+      assertNull(t.getMethod("tags").invoke(o), "readOnly tags must not be read from input");
+      Object out = t.getConstructor(String.class, String.class, String.class, String.class, java.util.List.class)
+          .newInstance("b", "r", "w", "i", java.util.List.of("x", "y"));
+      assertEquals(j.getMethod("toJSON", t).invoke(null, out),
+          "{\"both\":\"b\",\"readOnly\":\"r\",\"tags\":[\"x\",\"y\"]}");
     }
   }
 

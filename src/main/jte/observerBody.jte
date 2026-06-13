@@ -76,16 +76,18 @@
 @if(c.deserialize() && c.type().isDynamicMap())
       case "${c.wireKey()}" -> { return new AnyObjectObserver(); }
 @elseif(c.deserialize() && c.type().isMap())
-      case "${c.wireKey()}" -> { return new @template.cap(name = c.name())MapObserver(); }
+      case "${c.wireKey()}" -> { return new JSONPlanMapObserver<>(${c.name()}$plan); }
 @elseif(c.deserialize() && c.type().hasCompanion())
       case "${c.wireKey()}" -> { return new ${c.type().nestedCompanion()}(); }
 @endif
 @endfor
     }
-@if(view.catchAll().isEmpty())
-    throw new IllegalStateException("nested objects unsupported in this release");
-@else
+@if(!view.catchAll().isEmpty())
     return new AnyObjectObserver();
+@elseif(view.strict())
+    throw new JSONProcessingException("Unknown JSON key [" + key + "] for type [${view.simpleName()}]");
+@else
+    return SkipObserver.INSTANCE;
 @endif
   }
   @SuppressWarnings("unchecked")
@@ -103,14 +105,16 @@
     switch (key) {
 @for(Component c : view.typedComponents())
 @if(c.deserialize() && (c.type().isList() || c.type().isSet()))
-      case "${c.wireKey()}" -> { return new @template.cap(name = c.name())ArrayObserver(); }
+      case "${c.wireKey()}" -> { return JSONPlanArrayObserver.of(${c.name()}$plan); }
 @endif
 @endfor
     }
-@if(view.catchAll().isEmpty())
-    throw new IllegalStateException("arrays unsupported in this release");
-@else
+@if(!view.catchAll().isEmpty())
     return new AnyArrayObserver();
+@elseif(view.strict())
+    throw new JSONProcessingException("Unknown JSON key [" + key + "] for type [${view.simpleName()}]");
+@else
+    return SkipArrayObserver.INSTANCE;
 @endif
   }
   @SuppressWarnings("unchecked")

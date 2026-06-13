@@ -1,0 +1,3 @@
+@import org.lattejava.json.jte.Component
+@param Component c
+@if(c.type().isMap())private static final JSONPlan.MapNode<@template.declType(type = c.type().key()), @template.declType(type = c.type().value())> ${c.name()}$plan = @template.planNode(type = c.type());@elseif(c.type().isSet())private static final JSONPlan.SetNode<@template.declType(type = c.type().element())> ${c.name()}$plan = @template.planNode(type = c.type());@else private static final JSONPlan.ListNode<@template.declType(type = c.type().element())> ${c.name()}$plan = @template.planNode(type = c.type());@endif

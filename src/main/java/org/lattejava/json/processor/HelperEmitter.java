@@ -12,7 +12,8 @@ public final class HelperEmitter {
   public static final List<String> HELPERS = List.of(
       "AnyArrayObserver", "AnyObjectObserver", "Conversions", "JSONArrayBuilder",
       "JSONArrayObserver", "JSONBuilder", "JSONObjectHandler", "JSONObserver",
-      "JSONParser", "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
+      "JSONParser", "JSONPlan", "JSONPlanArrayObserver", "JSONPlanMapObserver",
+      "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
       "SkipArrayObserver", "SkipObserver");
   private boolean emitted = false;
   private final ProcessingEnvironment processingEnv;

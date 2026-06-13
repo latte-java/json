@@ -11,15 +11,6 @@ import static org.testng.Assert.*;
 
 public class CollectionRejectionTest {
   @Test
-  public void nestedCollectionRejected() throws Exception {
-    var r = ProcessorHarness.compile("badcollections");
-    assertFalse(r.success(), "nested collection / bad key must fail compilation");
-    assertTrue(r.diagnostics().stream().anyMatch(d ->
-            d.contains("nested collection") && d.contains("deep")),
-        "expected nested-collection error for [deep], got: " + r.diagnostics());
-  }
-
-  @Test
   public void nonStringFormMapKeyRejected() throws Exception {
     var r = ProcessorHarness.compile("badcollections");
     assertFalse(r.success());
@@ -29,11 +20,20 @@ public class CollectionRejectionTest {
   }
 
   @Test
-  public void rawOrWildcardCollectionRejected() throws Exception {
+  public void rawCollectionRejected() throws Exception {
     var r = ProcessorHarness.compile("badcollections");
-    assertFalse(r.success(), "raw / unbounded-wildcard collection component must fail compilation");
+    assertFalse(r.success(), "raw collection member must fail compilation");
     assertTrue(r.diagnostics().stream().anyMatch(d ->
-            d.contains("nested collection") && d.contains("raw")),
-        "expected nested-collection error for raw [raw], got: " + r.diagnostics());
+            d.contains("raw or wildcard") && d.contains("[raw]")),
+        "expected raw-collection error for [raw], got: " + r.diagnostics());
+  }
+
+  @Test
+  public void wildcardCollectionRejected() throws Exception {
+    var r = ProcessorHarness.compile("badcollections");
+    assertFalse(r.success(), "unbounded-wildcard collection member must fail compilation");
+    assertTrue(r.diagnostics().stream().anyMatch(d ->
+            d.contains("element type") && d.contains("anySet")),
+        "expected unsupported-element error for [anySet], got: " + r.diagnostics());
   }
 }

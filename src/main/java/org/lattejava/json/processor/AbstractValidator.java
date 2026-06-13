@@ -31,20 +31,11 @@ public abstract class AbstractValidator {
   }
 
   /**
-   * Whether {@code type} is a component type the processor can serialize: a primitive/boxed/{@code BigInteger}/
-   * {@code BigDecimal} number, a boolean, a string-form type (enum/{@code String}/{@code UUID}/{@code java.time}), or a
-   * single-level {@code List}/{@code Set}/{@code Map} of those (Map keys must be string-form).
+   * Whether {@code type} is a non-collection component type the processor can serialize: a primitive/boxed/
+   * {@code BigInteger}/{@code BigDecimal} number, a boolean, a string-form type (enum/{@code String}/{@code UUID}/
+   * {@code java.time}), or a type with a generated companion. Callers handle collections before calling this.
    */
   protected boolean isSupportedComponentType(TypeView type) {
-    if (type.isCollection()) {
-      if (type.isMap()) {
-        TypeView k = type.key();
-        TypeView v = type.value();
-        return k != null && v != null && k.isStringForm() && !v.isCollection() && isSupportedComponentType(v);
-      }
-      TypeView e = type.element();
-      return e != null && !e.isCollection() && isSupportedComponentType(e);
-    }
     return type.isPrimitive() || type.isNumeric() || type.isBool() || type.isStringForm() || type.hasCompanion();
   }
 
@@ -57,6 +48,55 @@ public abstract class AbstractValidator {
   protected boolean requireDiscriminatorInterface(TypeElement type) {
     if (type.getAnnotation(JSONSubtype.class) != null && ProcessorFacts.discriminatorInterface(type) == null) {
       error(type, "@JSONSubtype on [" + type.getQualifiedName() + "] requires an implemented @JSONTypeInfo interface");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Recursively validates a collection member's type tree: string-form keys at every Map level, no raw or
+   * wildcard type arguments, and supported leaf types. {@code Map<String, Object>} (the dynamic-map shape)
+   * is only legal as a member's direct type, never nested.
+   */
+  private boolean validateCollectionTree(Element at, CharSequence name, TypeView t) {
+    if (t.isMap()) {
+      TypeView k = t.key();
+      if (k == null) {
+        error(at, "@JSON member [" + name + "] uses a raw or wildcard Map which is not supported");
+        return false;
+      }
+      if (!k.isStringForm()) {
+        error(at, "@JSON member [" + name + "] has an unsupported Map key type [" + k.name()
+            + "] (Map key must be String, UUID, an enum, or a java.time type)");
+        return false;
+      }
+      TypeView v = t.value();
+      if (v.isCollection()) {
+        return validateCollectionTree(at, name, v);
+      }
+      if (v.isObject()) {
+        error(at, "@JSON member [" + name + "] has an unsupported Map value type [java.lang.Object] "
+            + "(Map<String, Object> is only supported as a member's direct type)");
+        return false;
+      }
+      if (!isSupportedComponentType(v)) {
+        error(at, v.isRecord() && !v.isNested() ? notJSON(at, v)
+            : "@JSON member [" + name + "] has an unsupported Map value type [" + v.name() + "]");
+        return false;
+      }
+      return true;
+    }
+    TypeView e = t.element();
+    if (e == null) {
+      error(at, "@JSON member [" + name + "] uses a raw or wildcard " + t.kind() + " which is not supported");
+      return false;
+    }
+    if (e.isCollection()) {
+      return validateCollectionTree(at, name, e);
+    }
+    if (!isSupportedComponentType(e)) {
+      error(at, e.isRecord() && !e.isNested() ? notJSON(at, e)
+          : "@JSON member [" + name + "] has an unsupported " + t.kind() + " element type [" + e.name() + "]");
       return false;
     }
     return true;
@@ -161,42 +201,12 @@ public abstract class AbstractValidator {
   /** Validates that a member's type is serializable (collection/map/element constraints + scalar support). */
   protected boolean validateType(Element at, CharSequence name, TypeView mt) {
     if (mt.isCollection()) {
-      if (mt.isMap()) {
-        TypeView k = mt.key();
-        TypeView v = mt.value();
-        if (k == null || !k.isStringForm()) {
-          error(at, "@JSON member [" + name + "] has an unsupported Map key type ["
-              + (k == null ? "?" : k.name()) + "] (Map key must be String, UUID, an enum, or a java.time type)");
-          return false;
-        }
-        // dynamic map: Map<String, Object> carries arbitrary JSON values, read/written via the Any* helpers
-        if (k.isString() && v != null && v.isObject()) {
-          return true;
-        }
-        if (v == null || v.isCollection()) {
-          error(at, "@JSON member [" + name + "] uses a nested collection as a Map value ["
-              + (v == null ? "?" : v.name()) + "] which is not supported in this release");
-          return false;
-        }
-        if (!isSupportedComponentType(v)) {
-          error(at, v.isRecord() && !v.isNested() ? notJSON(at, v)
-              : "@JSON member [" + name + "] has an unsupported Map value type [" + v.name() + "]");
-          return false;
-        }
+      // dynamic map: Map<String, Object> carries arbitrary JSON values, read/written via the Any* helpers.
+      // Only legal as the member's direct type, so it is recognized here, before the recursive walk.
+      if (mt.isDynamicMap()) {
         return true;
       }
-      TypeView e = mt.element();
-      if (e == null || e.isCollection()) {
-        error(at, "@JSON member [" + name + "] uses a nested collection ["
-            + (e == null ? "?" : e.name()) + "] which is not supported in this release");
-        return false;
-      }
-      if (!isSupportedComponentType(e)) {
-        error(at, e.isRecord() && !e.isNested() ? notJSON(at, e)
-            : "@JSON member [" + name + "] has an unsupported " + mt.kind() + " element type [" + e.name() + "]");
-        return false;
-      }
-      return true;
+      return validateCollectionTree(at, name, mt);
     }
     if (!isSupportedComponentType(mt)) {
       error(at, mt.isRecord() && !mt.isNested() ? notJSON(at, mt)
