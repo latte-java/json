@@ -37,7 +37,6 @@ public final class JSONProcessor extends AbstractProcessor {
   private ClassValidator classValidator;
   private CompanionWriter companionWriter;
   private HelperEmitter helperEmitter;
-  private ClassMemberDiscovery members;
   private PolymorphicValidator polymorphicValidator;
   private PolymorphicWriter polymorphicWriter;
   private RecordValidator recordValidator;
@@ -45,8 +44,9 @@ public final class JSONProcessor extends AbstractProcessor {
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
+
+    ClassMemberDiscovery members = new ClassMemberDiscovery(processingEnv);
     this.helperEmitter = new HelperEmitter(processingEnv);
-    this.members = new ClassMemberDiscovery(processingEnv);
     this.companionWriter = new CompanionWriter(processingEnv, members);
     this.polymorphicWriter = new PolymorphicWriter(processingEnv);
     this.recordValidator = new RecordValidator(processingEnv, members);
