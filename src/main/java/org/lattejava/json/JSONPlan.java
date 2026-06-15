@@ -9,10 +9,13 @@ import module java.base;
 /**
  * Type plan for a collection-typed {@code @JSON} member: a static, generic description of the member's
  * collection type tree, built by generated code from the typed factories below and interpreted at runtime —
- * by {@link #write} on the serialize side and by {@link JSONPlanMapObserver}/{@link JSONPlanArrayObserver}
+ * by {@link #writeInto} on the serialize side and by {@link JSONPlanMapObserver}/{@link JSONPlanArrayObserver}
  * on the deserialize side. {@code @JSON} object leaves dispatch to their generated companions; scalar
  * leaves carry the generated conversion lambdas. Plans are immutable and shared (one static instance per
  * member); interpretation allocates per parse only.
+ *
+ * <p>Serialization streams every nesting level into a single {@link JSONWriter} — no intermediate strings
+ * are produced at any depth.
  *
  * @author Brian Pontarelli
  */
@@ -24,10 +27,10 @@ public final class JSONPlan {
   public sealed interface Node<T> permits ListNode, MapNode, ObjectLeaf, ScalarLeaf, SetNode {
   }
 
-  /** Keyed scalar write into a {@link JSONBuilder} (the map-value position of a scalar leaf). */
+  /** Keyed scalar write into a {@link JSONWriter} (the map-value position of a scalar leaf). */
   @FunctionalInterface
   public interface KeyedWrite<T> {
-    void write(JSONBuilder builder, String key, T value);
+    void write(JSONWriter writer, String key, T value);
   }
 
   public record ListNode<E>(Node<E> child) implements Node<List<E>> {
@@ -36,18 +39,18 @@ public final class JSONPlan {
   public record MapNode<K, V>(Function<String, K> keyReader, Function<K, String> keyWriter, Node<V> child) implements Node<Map<K, V>> {
   }
 
-  public record ObjectLeaf<T>(String typeName, Supplier<JSONObjectHandler> observer, Function<T, String> writer) implements Node<T> {
+  public record ObjectLeaf<T>(String typeName, Supplier<JSONObjectHandler> observer, BiConsumer<JSONWriter, T> writer) implements Node<T> {
   }
 
   /**
    * A scalar leaf's conversion lambdas. A null read converter ({@code fromString}/{@code fromInteger}/
    * {@code fromBigInteger}/{@code fromDecimal}) means the corresponding JSON form is illegal for this leaf;
    * {@code acceptsBool} marks the boolean leaf. The write lambdas must tolerate a null value ({@code append}
-   * writes a JSON null; {@code write} defers to the builder's omit-nulls handling).
+   * writes a JSON null; {@code write} defers to the writer's omit-nulls handling).
    */
   public record ScalarLeaf<T>(String typeName, Function<String, T> fromString, LongFunction<T> fromInteger,
                               Function<BigInteger, T> fromBigInteger, Function<BigDecimal, T> fromDecimal,
-                              boolean acceptsBool, BiConsumer<JSONArrayBuilder, T> append, KeyedWrite<T> write) implements Node<T> {
+                              boolean acceptsBool, BiConsumer<JSONWriter, T> append, KeyedWrite<T> write) implements Node<T> {
   }
 
   public record SetNode<E>(Node<E> child) implements Node<Set<E>> {
@@ -61,13 +64,13 @@ public final class JSONPlan {
     return new MapNode<>(keyReader, keyWriter, child);
   }
 
-  public static <T> Node<T> object(String typeName, Supplier<JSONObjectHandler> observer, Function<T, String> writer) {
+  public static <T> Node<T> object(String typeName, Supplier<JSONObjectHandler> observer, BiConsumer<JSONWriter, T> writer) {
     return new ObjectLeaf<>(typeName, observer, writer);
   }
 
   public static <T> Node<T> scalar(String typeName, Function<String, T> fromString, LongFunction<T> fromInteger,
                                    Function<BigInteger, T> fromBigInteger, Function<BigDecimal, T> fromDecimal,
-                                   boolean acceptsBool, BiConsumer<JSONArrayBuilder, T> append, KeyedWrite<T> write) {
+                                   boolean acceptsBool, BiConsumer<JSONWriter, T> append, KeyedWrite<T> write) {
     return new ScalarLeaf<>(typeName, fromString, fromInteger, fromBigInteger, fromDecimal, acceptsBool, append, write);
   }
 
@@ -86,38 +89,79 @@ public final class JSONPlan {
     };
   }
 
-  /** Serializes {@code value} (a collection member) as raw JSON by walking {@code node}; a null member yields null. */
+  /**
+   * Convenience: serializes {@code value} (a collection member) to a String by streaming through a fresh
+   * {@link JSONWriter}; a null member yields {@code null}.
+   */
   public static <T> String write(Node<T> node, T value, boolean omitNulls) {
     if (value == null) {
       return null;
     }
+    JSONWriter w = JSONWriter.acquire(omitNulls);
+    writeInto(w, node, value);
+    return w.finishString();
+  }
 
-    return switch (node) {
-      case ListNode<?> n -> writeArray(n.child(), (Collection<?>) value, omitNulls);
-      case MapNode<?, ?> n -> writeMap(n, (Map<?, ?>) value, omitNulls);
-      case ObjectLeaf<?> n -> writeObject(n, value);
+  /**
+   * Streams {@code value} (a collection member) into {@code w} by walking {@code node}, honoring the
+   * writer's current omit-nulls setting. The caller has already verified {@code value} is non-null and
+   * written its member key (or array/element separator) into {@code w}.
+   */
+  public static <T> void writeInto(JSONWriter w, Node<T> node, T value) {
+    switch (node) {
+      case ListNode<?> n -> writeArray(w, n.child(), (Collection<?>) value);
+      case SetNode<?> n -> writeArray(w, n.child(), (Collection<?>) value);
+      case MapNode<?, ?> n -> writeMap(w, n, (Map<?, ?>) value);
+      case ObjectLeaf<?> n -> writeObject(n, w, value);
       case ScalarLeaf<?> n -> throw new JSONProcessingException("Plan root for type [" + n.typeName() + "] must be a collection node");
-      case SetNode<?> n -> writeArray(n.child(), (Collection<?>) value, omitNulls);
-    };
+    }
   }
 
   @SuppressWarnings("unchecked")
-  private static <T> void appendScalar(ScalarLeaf<T> leaf, JSONArrayBuilder builder, Object value) {
-    leaf.append().accept(builder, (T) value);
+  private static <T> void appendScalar(ScalarLeaf<T> leaf, JSONWriter w, Object value) {
+    leaf.append().accept(w, (T) value);
   }
 
-  private static <E> String writeArray(Node<E> child, Collection<?> value, boolean omitNulls) {
-    var b = new JSONArrayBuilder(omitNulls);
+  private static <E> void writeArray(JSONWriter w, Node<E> child, Collection<?> value) {
+    w.beginArray();
     for (Object e : value) {
-      switch (child) {
-        case ListNode<?> n -> b.raw(e == null ? null : writeArray(n.child(), (Collection<?>) e, omitNulls));
-        case MapNode<?, ?> n -> b.raw(e == null ? null : writeMap(n, (Map<?, ?>) e, omitNulls));
-        case ObjectLeaf<?> n -> b.raw(e == null ? null : writeObject(n, e));
-        case ScalarLeaf<?> n -> appendScalar(n, b, e);
-        case SetNode<?> n -> b.raw(e == null ? null : writeArray(n.child(), (Collection<?>) e, omitNulls));
+      writeElement(w, child, e);
+    }
+    w.endArray();
+  }
+
+  private static void writeElement(JSONWriter w, Node<?> child, Object e) {
+    switch (child) {
+      case ListNode<?> n -> {
+        if (e == null) {
+          w.nullElement();
+        } else {
+          writeArray(w, n.child(), (Collection<?>) e);
+        }
+      }
+      case MapNode<?, ?> n -> {
+        if (e == null) {
+          w.nullElement();
+        } else {
+          writeMap(w, n, (Map<?, ?>) e);
+        }
+      }
+      case ObjectLeaf<?> n -> {
+        if (e == null) {
+          w.nullElement();
+        } else {
+          writeObject(n, w, e);
+        }
+      }
+      case ScalarLeaf<?> n -> appendScalar(n, w, e);
+      case SetNode<?> n -> {
+        if (e == null) {
+          w.nullElement();
+        } else {
+          writeArray(w, n.child(), (Collection<?>) e);
+        }
       }
     }
-    return b.build();
   }
 
   @SuppressWarnings("unchecked")
@@ -125,30 +169,60 @@ public final class JSONPlan {
     return node.keyWriter().apply((K) key);
   }
 
-  private static <K, V> String writeMap(MapNode<K, V> node, Map<?, ?> value, boolean omitNulls) {
-    var b = new JSONBuilder(omitNulls);
+  private static <K, V> void writeMap(JSONWriter w, MapNode<K, V> node, Map<?, ?> value) {
+    w.beginObject();
     Node<V> child = node.child();
     for (var en : value.entrySet()) {
-      String key = writeKey(node, en.getKey());
-      Object v = en.getValue();
-      switch (child) {
-        case ListNode<?> n -> b.array(key, v == null ? null : writeArray(n.child(), (Collection<?>) v, omitNulls));
-        case MapNode<?, ?> n -> b.object(key, v == null ? null : writeMap(n, (Map<?, ?>) v, omitNulls));
-        case ObjectLeaf<?> n -> b.object(key, v == null ? null : writeObject(n, v));
-        case ScalarLeaf<?> n -> writeScalar(n, b, key, v);
-        case SetNode<?> n -> b.array(key, v == null ? null : writeArray(n.child(), (Collection<?>) v, omitNulls));
+      writeMember(w, child, writeKey(node, en.getKey()), en.getValue());
+    }
+    w.endObject();
+  }
+
+  private static void writeMember(JSONWriter w, Node<?> child, String key, Object v) {
+    switch (child) {
+      case ListNode<?> n -> {
+        if (v == null) {
+          w.nullValue(key);
+        } else {
+          w.key(key);
+          writeArray(w, n.child(), (Collection<?>) v);
+        }
+      }
+      case MapNode<?, ?> n -> {
+        if (v == null) {
+          w.nullValue(key);
+        } else {
+          w.key(key);
+          writeMap(w, n, (Map<?, ?>) v);
+        }
+      }
+      case ObjectLeaf<?> n -> {
+        if (v == null) {
+          w.nullValue(key);
+        } else {
+          w.key(key);
+          writeObject(n, w, v);
+        }
+      }
+      case ScalarLeaf<?> n -> writeScalar(n, w, key, v);
+      case SetNode<?> n -> {
+        if (v == null) {
+          w.nullValue(key);
+        } else {
+          w.key(key);
+          writeArray(w, n.child(), (Collection<?>) v);
+        }
       }
     }
-    return b.build();
   }
 
   @SuppressWarnings("unchecked")
-  private static <T> String writeObject(ObjectLeaf<T> leaf, Object value) {
-    return leaf.writer().apply((T) value);
+  private static <T> void writeObject(ObjectLeaf<T> leaf, JSONWriter w, Object value) {
+    leaf.writer().accept(w, (T) value);
   }
 
   @SuppressWarnings("unchecked")
-  private static <T> void writeScalar(ScalarLeaf<T> leaf, JSONBuilder builder, String key, Object value) {
-    leaf.write().write(builder, key, (T) value);
+  private static <T> void writeScalar(ScalarLeaf<T> leaf, JSONWriter w, String key, Object value) {
+    leaf.write().write(w, key, (T) value);
   }
 }

@@ -10,11 +10,11 @@ import module java.compiler;
 /** Copies the canonical runtime-helper sources into {@code <module>.internal}, once per compilation. Owns its state. */
 public final class HelperEmitter {
   public static final List<String> HELPERS = List.of(
-      "AnyArrayObserver", "AnyObjectObserver", "Conversions", "JSONArrayBuilder",
-      "JSONArrayObserver", "JSONBuilder", "JSONObjectHandler", "JSONObserver",
-      "JSONParser", "JSONPlan", "JSONPlanArrayObserver", "JSONPlanMapObserver",
-      "JSONPolymorphicObserver", "JSONProcessingException", "Numbers",
-      "SkipArrayObserver", "SkipObserver");
+      "AnyArrayObserver", "AnyObjectObserver", "Conversions", "JSONArrayObserver",
+      "JSONObjectHandler", "JSONObserver", "JSONParser", "JSONPlan",
+      "JSONPlanArrayObserver", "JSONPlanMapObserver", "JSONPolymorphicObserver",
+      "JSONProcessingException", "JSONWriter", "Numbers", "SkipArrayObserver",
+      "SkipObserver");
   private boolean emitted = false;
   private final ProcessingEnvironment processingEnv;
 

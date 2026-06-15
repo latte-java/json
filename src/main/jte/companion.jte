@@ -19,13 +19,12 @@ import ${view.internalPackage()}.JSONPlanArrayObserver;
 import ${view.internalPackage()}.JSONPlanMapObserver;
 @endif
 import ${view.internalPackage()}.Conversions;
-import ${view.internalPackage()}.JSONArrayBuilder;
 import ${view.internalPackage()}.JSONArrayObserver;
-import ${view.internalPackage()}.JSONBuilder;
 import ${view.internalPackage()}.JSONObjectHandler;
 import ${view.internalPackage()}.JSONObserver;
 import ${view.internalPackage()}.JSONParser;
 import ${view.internalPackage()}.JSONProcessingException;
+import ${view.internalPackage()}.JSONWriter;
 import ${view.internalPackage()}.Numbers;
 @if(view.catchAll().isEmpty() && !view.strict())
 import ${view.internalPackage()}.SkipArrayObserver;
@@ -56,42 +55,48 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 @endfor
 
   public static String toJSON(${view.simpleName()} value) {
-    return builder(value).build();
+    JSONWriter w = JSONWriter.acquire(${view.omitNulls()});
+    write(w, value);
+    return w.finishString();
   }
 
   public static byte[] toJSONBytes(${view.simpleName()} value) {
-    return builder(value).buildBytes();
+    JSONWriter w = JSONWriter.acquire(${view.omitNulls()});
+    write(w, value);
+    return w.finishBytes();
   }
 
-  private static JSONBuilder builder(${view.simpleName()} value) {
-    JSONBuilder b = new JSONBuilder(${view.omitNulls()})
+  /** Writes {@code value} as a JSON object into {@code w}. Parent companions call this to share one buffer. */
+  public static void write(JSONWriter w, ${view.simpleName()} value) {
+    boolean prevOmitNulls = w.omitNulls(${view.omitNulls()});
+    w.beginObject();
 @if(!view.discriminatorKey().isEmpty())
-        .string("${view.discriminatorKey()}", "${view.discriminatorValue()}")
+    w.string("${view.discriminatorKey()}", "${view.discriminatorValue()}");
 @endif
 @for(Component c : view.typedComponents())
 @if(c.serialize())
 @if(c.isFormatted())
-        .string("${c.wireKey()}", value.${c.read()} == null ? null : ${c.formatterField()}.format(value.${c.read()}))
+    w.string("${c.wireKey()}", value.${c.read()} == null ? null : ${c.formatterField()}.format(value.${c.read()}));
 @elseif(c.isEpochInstant())
-        .integer("${c.wireKey()}", value.${c.read()} == null ? null : value.${c.read()}.${c.epochMethod()}())
-@elseif(c.type().isList() || c.type().isSet())
-        .array("${c.wireKey()}", value.${c.read()} == null ? null : JSONPlan.write(${c.name()}$plan, value.${c.read()}, ${view.omitNulls()}))
+    w.integer("${c.wireKey()}", value.${c.read()} == null ? null : value.${c.read()}.${c.epochMethod()}());
+@elseif(c.type().isList() || c.type().isSet() || (c.type().isMap() && !c.type().isDynamicMap()))
+    if (value.${c.read()} == null) { w.nullValue("${c.wireKey()}"); } else { w.key("${c.wireKey()}"); JSONPlan.writeInto(w, ${c.name()}$plan, value.${c.read()}); }
 @elseif(c.type().isDynamicMap())
-        .object("${c.wireKey()}", value.${c.read()} == null ? null : ${c.name()}ToJSON(value.${c.read()}))
-@elseif(c.type().isMap())
-        .object("${c.wireKey()}", value.${c.read()} == null ? null : JSONPlan.write(${c.name()}$plan, value.${c.read()}, ${view.omitNulls()}))
+    if (value.${c.read()} == null) { w.nullValue("${c.wireKey()}"); } else { w.key("${c.wireKey()}"); ${c.name()}Write(w, value.${c.read()}); }
+@elseif(c.type().hasCompanion())
+    if (value.${c.read()} == null) { w.nullValue("${c.wireKey()}"); } else { w.key("${c.wireKey()}"); ${c.type().nestedCompanion()}.write(w, value.${c.read()}); }
 @else
-        .@template.memberCall(type = c.type(), key = "\"" + c.wireKey() + "\"", val = "value." + c.read())
+    w.@template.memberCall(type = c.type(), key = "\"" + c.wireKey() + "\"", val = "value." + c.read());
 @endif
 @endif
 @endfor
-        ;
 @if(!view.catchAll().isEmpty())
     for (var entry : value.${view.catchAllRead()}.entrySet()) {
-      b.any(entry.getKey(), entry.getValue());
+      w.any(entry.getKey(), entry.getValue());
     }
 @endif
-    return b;
+    w.endObject();
+    w.omitNulls(prevOmitNulls);
   }
 
   public static ${view.simpleName()} fromJSON(String json) {
@@ -106,7 +111,7 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
 
 @for(Component c : view.collectionComponents())
 @if(c.type().isDynamicMap())
-@template.dynamicMap(c = c, omitNulls = view.omitNulls())
+@template.dynamicMap(c = c)
 @endif
 @endfor
 @template.observerBody(view = view)

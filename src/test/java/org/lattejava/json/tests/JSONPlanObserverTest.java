@@ -18,15 +18,15 @@ public class JSONPlanObserverTest {
         value -> Numbers.toIntExact(value),
         value -> Numbers.toIntExact(value),
         false,
-        (b, e) -> b.integer(e == null ? null : e.longValue()),
-        (b, k, e) -> b.integer(k, e));
+        (w, e) -> w.integerElement(e == null ? null : e.longValue()),
+        (w, k, e) -> w.integer(k, e));
   }
 
   static JSONPlan.Node<String> stringLeaf() {
     return JSONPlan.scalar("java.lang.String",
         value -> value, null, null, null, false,
-        (b, e) -> b.string(e),
-        (b, k, e) -> b.string(k, e));
+        (w, e) -> w.stringElement(e),
+        (w, k, e) -> w.string(k, e));
   }
 
   @Test
@@ -58,7 +58,7 @@ public class JSONPlanObserverTest {
   @Test
   public void readsObjectLeafThroughItsObserver() {
     JSONPlan.Node<Map<String, Object>> leaf =
-        JSONPlan.object("demo.Fake", AnyObjectObserver::new, v -> "{}");
+        JSONPlan.object("demo.Fake", AnyObjectObserver::new, (w, v) -> { w.beginObject(); w.endObject(); });
     var plan = JSONPlan.map(k -> k, k -> k, JSONPlan.list(leaf));
     Map<String, List<Map<String, Object>>> v =
         new JSONParser().parse("{\"a\":[{\"x\":1}]}", new JSONPlanMapObserver<>(plan));

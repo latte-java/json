@@ -1,0 +1,1 @@
+{"iss":"https://idp.example.com","sub":"f47ac10b-58cc-4372-a567-0e02b2c3d479","aud":"api://default","exp":1781234567,"iat":1781230967,"jti":"9a7b6c5d-4e3f-4a2b-9c8d-7e6f5a4b3c2d","roles":["admin","editor","viewer"]}

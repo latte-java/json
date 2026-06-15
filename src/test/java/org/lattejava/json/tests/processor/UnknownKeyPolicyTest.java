@@ -26,6 +26,49 @@ public class UnknownKeyPolicyTest {
   }
 
   @Test
+  public void lenientSkipAcceptsValidLiteralsAndNumbers() throws Exception {
+    var r = ProcessorHarness.compile("simple");
+    assertTrue(r.success(), r.diagnostics().toString());
+    try (var loader = (URLClassLoader) r.loader()) {
+      Class<?> userClass = loader.loadClass("demo.User");
+      Class<?> userJson  = loader.loadClass("demo.internal.UserJSON");
+      // f1..f4 are unknown and travel the skip path; well-formed literals and numbers must still skip cleanly.
+      Object parsed = userJson.getMethod("fromJSON", String.class)
+          .invoke(null, "{\"name\":\"Z\",\"f1\":true,\"f2\":false,\"f3\":null,\"age\":1,\"f4\":-12.5e3,\"email\":\"z@z\"}");
+      assertEquals(userClass.getMethod("name").invoke(parsed), "Z");
+      assertEquals(userClass.getMethod("age").invoke(parsed), 1);
+      assertEquals(userClass.getMethod("email").invoke(parsed), "z@z");
+    }
+  }
+
+  @Test
+  public void lenientSkipRejectsMalformedSkippedValues() throws Exception {
+    var r = ProcessorHarness.compile("simple");
+    assertTrue(r.success(), r.diagnostics().toString());
+    try (var loader = (URLClassLoader) r.loader()) {
+      Class<?> userJson = loader.loadClass("demo.internal.UserJSON");
+      // A skipped unknown value is held to the same literal/number grammar as a parsed one — the skip path
+      // no longer waves through malformed literals or numbers just because the key is unknown.
+      for (String json : new String[]{
+          "{\"name\":\"Z\",\"junk\":trXX,\"age\":1,\"email\":\"z@z\"}",   // literal that is not [true]
+          "{\"name\":\"Z\",\"junk\":nul,\"age\":1,\"email\":\"z@z\"}",     // truncated [null]
+          "{\"name\":\"Z\",\"junk\":1.2.3,\"age\":1,\"email\":\"z@z\"}",   // number with a second [.]
+          "{\"name\":\"Z\",\"junk\":--5,\"age\":1,\"email\":\"z@z\"}",     // doubled sign
+          "{\"name\":\"Z\",\"junk\":01,\"age\":1,\"email\":\"z@z\"}"}) {   // leading zero
+        try {
+          userJson.getMethod("fromJSON", String.class).invoke(null, json);
+          fail("skip path must reject a malformed unknown value: " + json);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+          Throwable cause = e.getCause();
+          assertNotNull(cause, "expected a cause for: " + json);
+          assertEquals(cause.getClass().getSimpleName(), "JSONProcessingException",
+              "malformed skipped value must surface as JSONProcessingException, got: " + cause + " for " + json);
+        }
+      }
+    }
+  }
+
+  @Test
   public void lenientSkipsUnknownCompoundValues() throws Exception {
     var r = ProcessorHarness.compile("simple");
     assertTrue(r.success(), r.diagnostics().toString());

@@ -1,8 +1,7 @@
 @import org.lattejava.json.jte.Component
 @param Component c
-@param boolean omitNulls
-  private static String ${c.name()}ToJSON(@template.declType(type = c.type()) v) {
-    var b = new JSONBuilder(${omitNulls});
-    for (var en : v.entrySet()) b.any(en.getKey(), en.getValue());
-    return b.build();
+  private static void ${c.name()}Write(JSONWriter w, @template.declType(type = c.type()) v) {
+    w.beginObject();
+    for (var en : v.entrySet()) w.any(en.getKey(), en.getValue());
+    w.endObject();
   }

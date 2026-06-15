@@ -29,6 +29,12 @@ public final class SkipObserver implements JSONObserver<Object> {
     return INSTANCE;
   }
 
+  /** Everything is discarded anyway; let the parser skip values without materializing keys. */
+  @Override
+  public boolean dispatchUnknown() {
+    return false;
+  }
+
   @Override public void bigInteger(String key, BigInteger value) {}
   @Override public void bool(String key, boolean value) {}
   @Override public void decimal(String key, BigDecimal value) {}

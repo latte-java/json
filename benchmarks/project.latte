@@ -1,0 +1,51 @@
+/*
+ * Copyright (c) 2026 The Latte Project
+ * SPDX-License-Identifier: MIT
+ */
+project(group: "org.lattejava", name: "json-benchmarks", version: "0.1.0", licenses: ["MIT"]) {
+  workflow {
+    standard()
+  }
+
+  dependencies {
+    group(name: "compile-processors") {
+      dependency(id: "org.lattejava:json:0.3.0-{integration}")
+      dependency(id: "org.openjdk.jmh:jmh-generator-annprocess:1.37")
+    }
+    group(name: "compile") {
+      dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.19.0")
+      dependency(id: "com.fasterxml.jackson.core:jackson-core:2.19.0")
+      dependency(id: "com.fasterxml.jackson.core:jackson-databind:2.19.0")
+      dependency(id: "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.0")
+      dependency(id: "com.google.code.gson:gson:2.14.0")
+      dependency(id: "org.openjdk.jmh:jmh-core:1.37")
+    }
+  }
+}
+
+// Plugins
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.4.0")
+file = loadPlugin(id: "org.lattejava.plugin:file:0.4.0")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.4.4")
+
+// Plugin settings
+java.settings.javaVersion = "25"
+
+target(name: "clean", description: "Cleans the project") {
+  java.clean()
+}
+
+target(name: "build", description: "Compiles and JARs the benchmarks") {
+  java.compile()
+  java.jar()
+}
+
+target(name: "app", description: "Assembles the runnable benchmark classpath in build/dist/lib", dependsOn: ["build"]) {
+  dependency.copy(to: "build/dist/lib") {
+    dependencies(group: "compile", transitive: true, fetchSource: false, transitiveGroups: ["compile", "runtime"])
+  }
+
+  file.copy(to: "build/dist/lib") {
+    fileSet(dir: "build/jars")
+  }
+}

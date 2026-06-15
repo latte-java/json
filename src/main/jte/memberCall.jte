@@ -3,9 +3,7 @@
 @param String val
 !{
   String call;
-  if (type.hasCompanion()) {
-    call = "object(" + key + ", " + val + " == null ? null : " + type.nestedCompanion() + ".toJSON(" + val + "))";
-  } else if (type.isEnum()) {
+  if (type.isEnum()) {
     call = "string(" + key + ", " + val + " == null ? null : " + val + ".name())";
   } else {
     call = switch (type.name()) {
@@ -13,9 +11,10 @@
       case "boolean", "java.lang.Boolean" -> "bool(" + key + ", " + val + ")";
       case "byte", "short", "int", "long",
            "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long" -> "integer(" + key + ", " + val + ")";
-      case "float", "double" -> "decimal(" + key + ", java.math.BigDecimal.valueOf(" + val + "))";
-      case "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" -> "decimal(" + key + ", " + val + ")";
+      case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" -> "decimal(" + key + ", " + val + ")";
       case "java.math.BigInteger" -> "bigInteger(" + key + ", " + val + ")";
+      case "java.time.Instant" -> "instant(" + key + ", " + val + ")";
+      case "java.util.UUID" -> "uuid(" + key + ", " + val + ")";
       default -> "string(" + key + ", " + val + " == null ? null : " + val + ".toString())";
     };
   }
