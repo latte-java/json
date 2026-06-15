@@ -1,0 +1,21 @@
+#!/bin/sh
+# Validate that the commit subject follows Conventional Commits.
+# https://www.conventionalcommits.org/en/v1.0.0/
+# Only the subject (first line) is checked; trailers like Co-Authored-By are ignored.
+
+subject=$(head -n 1 "$1")
+
+# Let git's own auto-generated commits through (merge/revert/fixup/squash).
+case "$subject" in
+  "Merge "* | "Revert "* | "fixup! "* | "squash! "*) exit 0 ;;
+esac
+
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+'
+if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+  echo "commit-msg hook: subject is not a Conventional Commit." >&2
+  echo "  got:      $subject" >&2
+  echo "  expected: <type>[(scope)][!]: <description>" >&2
+  echo "  types:    feat fix docs style refactor perf test build ci chore revert" >&2
+  echo "  example:  feat(client): add retrieveApplication overload" >&2
+  exit 1
+fi
