@@ -28,7 +28,7 @@ project(group: "org.lattejava", name: "json", version: "0.4.0", licenses: ["MIT"
 
 // Plugins
 dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.4.0")
-file = loadPlugin(id: "org.lattejava.plugin:file:0.4.2")
+file = loadPlugin(id: "org.lattejava.plugin:file:0.4.3")
 idea = loadPlugin(id: "org.lattejava.plugin:idea:0.4.1")
 java = loadPlugin(id: "org.lattejava.plugin:java:0.4.4")
 javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.4.0")
@@ -43,9 +43,10 @@ target(name: "clean", description: "Cleans the project") {
 }
 
 target(name: "build", description: "Compiles and JARs the project") {
-  file.execute("git config core.hooksPath .githooks")
-  
+  file.execute(cmd: "git config core.hooksPath .githooks")
+
   java.compileMain()
+
   // Precompile the JTE templates (src/main/jte/*.jte) into build/classes/main under
   // org.lattejava.json.jte.generated, so the precompiled classes are baked into the jar. Runs the
   // just-compiled Generate main off the exploded classes dir (the jar does not exist yet) plus the
