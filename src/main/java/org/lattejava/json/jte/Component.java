@@ -9,14 +9,15 @@ import module java.compiler;
 import org.lattejava.json.InstantFormat;
 import org.lattejava.json.JSONCatchAll;
 import org.lattejava.json.JSONField;
+import org.lattejava.json.JSONRaw;
 import org.lattejava.json.NamingStrategies;
 import org.lattejava.json.NamingStrategy;
 
 /**
  * Template-facing view of one {@code @JSON} member — a record component or an {@code @JSONConstructor} parameter: its
  * Java name, its wire key, the serialize read-accessor ({@link #read()}), the {@link TypeView} facts, and its
- * {@code @JSONField}/{@code @JSONCatchAll} facts. All serializer/observer code is assembled from these facts in the JTE
- * templates — there is no code-string logic here.
+ * {@code @JSONField}/{@code @JSONCatchAll}/{@code @JSONRaw} facts. All serializer/observer code is assembled from
+ * these facts in the JTE templates — there is no code-string logic here.
  *
  * @author Brian Pontarelli
  */
@@ -28,6 +29,7 @@ public final class Component {
   private final boolean ignore;
   private final InstantFormat instant;
   private final String name;
+  private final boolean raw;
   private final String read;
   private final boolean readOnly;
   private final TypeView type;
@@ -48,6 +50,7 @@ public final class Component {
   public Component(ProcessingEnvironment processingEnv, Element element, NamingStrategy naming, String read) {
     JSONField field = element.getAnnotation(JSONField.class);
     this.catchAll = element.getAnnotation(JSONCatchAll.class) != null;
+    this.raw = element.getAnnotation(JSONRaw.class) != null;
     this.name = element.getSimpleName().toString();
     this.type = new TypeView(processingEnv, element.asType());
     this.wireKey = wireKey(element, naming);
@@ -65,15 +68,20 @@ public final class Component {
 
   /**
    * A JavaBean property. The {@code @JSONField}/{@code @JSONCatchAll} facts come from {@code config} (the field or an
-   * accessor, resolved field-first by the processor); the wire key, type, and read/write accessors are passed
-   * explicitly. {@code read}/{@code write} are empty when the property has no getter/setter+field — folded into
-   * {@code hasReader}/{@code hasWriter} so a getter-only property is read-only and a setter-only property write-only.
+   * accessor, resolved field-first by the processor); {@code @JSONRaw} is resolved independently of {@code config},
+   * before this constructor ever runs — {@code ClassMemberDiscovery} scans every candidate element for it separately
+   * (see its {@code firstAnnotated} helper and the independently-resolved elements on {@code BeanProperty}), so by
+   * the time a property reaches here, validation has already confirmed {@code config} and the {@code @JSONRaw}
+   * element agree. The wire key, type, and read/write accessors are passed explicitly. {@code read}/{@code write}
+   * are empty when the property has no getter/setter+field — folded into {@code hasReader}/{@code hasWriter} so a
+   * getter-only property is read-only and a setter-only property write-only.
    */
   public Component(ProcessingEnvironment processingEnv, String name, TypeMirror type, Element config,
                    NamingStrategy naming, String read, String write, boolean writeSetter) {
     JSONField field = config == null ? null : config.getAnnotation(JSONField.class);
     String override = field == null ? "" : field.name();
     this.catchAll = config != null && config.getAnnotation(JSONCatchAll.class) != null;
+    this.raw = config != null && config.getAnnotation(JSONRaw.class) != null;
     this.name = name;
     this.type = new TypeView(processingEnv, type);
     this.wireKey = override.isEmpty() ? NamingStrategies.apply(naming, name) : override;
@@ -143,6 +151,11 @@ public final class Component {
 
   public boolean isFormatted() {
     return !format.isEmpty();
+  }
+
+  /** Whether this member is the {@code @JSONRaw} receiver: no wire key, never serialized, set from the object span. */
+  public boolean isRaw() {
+    return raw;
   }
 
   public String name() {

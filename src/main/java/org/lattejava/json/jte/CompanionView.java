@@ -111,6 +111,11 @@ public final class CompanionView {
     return qualifiedType;
   }
 
+  /** The Java name of the {@code @JSONRaw} component, or {@code ""} when the type has none. */
+  public String raw() {
+    return components.stream().filter(Component::isRaw).findFirst().map(Component::name).orElse("");
+  }
+
   public String simpleName() {
     return simpleName;
   }
@@ -119,8 +124,11 @@ public final class CompanionView {
     return strict;
   }
 
-  /** The components that participate in typed serialize/deserialize codegen — everything except the catch-all. */
+  /**
+   * The components that participate in typed serialize/deserialize codegen — everything except the catch-all and the
+   * {@code @JSONRaw} member, neither of which owns a wire key.
+   */
   public List<Component> typedComponents() {
-    return components.stream().filter(c -> !c.isCatchAll()).toList();
+    return components.stream().filter(c -> !c.isCatchAll() && !c.isRaw()).toList();
   }
 }

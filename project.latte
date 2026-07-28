@@ -2,7 +2,7 @@
  * Copyright (c) 2025-2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
-project(group: "org.lattejava", name: "json", version: "0.4.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "json", version: "0.4.1", licenses: ["MIT"]) {
   workflow {
     standard()
   }
@@ -61,7 +61,7 @@ target(name: "build", description: "Compiles and JARs the project") {
   file.copy(to: "build/classes/main/org/lattejava/json/internal") {
     fileSet(dir: "src/main/java/org/lattejava/json/",
         includePatterns: [/Any.*/, /Conversion.*/, /JSON.*/, /Numbers.*/, /Skip.*/],
-        excludePatterns: [/JSON.java/, /JSONCatchAll.java/, /JSONConstructor.java/, /JSONField.java/, /JSONProcessor.java/, /JSONSubtype.java/, /JSONTypeInfo.java/])
+        excludePatterns: [/JSON.java/, /JSONCatchAll.java/, /JSONConstructor.java/, /JSONField.java/, /JSONProcessor.java/, /JSONRaw.java/, /JSONSubtype.java/, /JSONTypeInfo.java/])
   }
   java.jar()
 }

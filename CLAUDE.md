@@ -41,7 +41,7 @@ This module is a **compile-time annotation processor**, not a runtime JSON libra
 
 The module `exports org.lattejava.json`, which contains:
 
-- **Annotations** — `@JSON` (type-level; elements `naming`, `omitNulls` default `true`, `strict` default `false`), `@JSONField` (per-member: `name`, `ignore`, `format`, `instant`, `readOnly`, `writeOnly`), `@JSONCatchAll` (one `Map<String, Object>` bucket for unknown keys), `@JSONConstructor` (deserialization constructor for non-record classes), `@JSONTypeInfo` (`property` discriminator on a sealed interface) + `@JSONSubtype` (a subtype's discriminator value).
+- **Annotations** — `@JSON` (type-level; elements `naming`, `omitNulls` default `true`, `strict` default `false`), `@JSONField` (per-member: `name`, `ignore`, `format`, `instant`, `readOnly`, `writeOnly`), `@JSONCatchAll` (one `Map<String, Object>` bucket for unknown keys), `@JSONRaw` (one `String` member receiving the verbatim JSON text of the object being deserialized; deserialize-only, owns no wire key), `@JSONConstructor` (deserialization constructor for non-record classes), `@JSONTypeInfo` (`property` discriminator on a sealed interface) + `@JSONSubtype` (a subtype's discriminator value).
 - **Enums** — `NamingStrategy` (`IDENTITY`, `CAMEL_CASE`, `SNAKE_CASE`, `KEBAB_CASE`, `PASCAL_CASE`; applied at compile time) and `InstantFormat` (`ISO`, `EPOCH_SECONDS`, `EPOCH_MILLIS`).
 - **`JSONProcessor`** — the processor itself. It owns only round-level guards and a dispatch table; member discovery, validation, helper emission, and companion generation live in `org.lattejava.json.processor.*`.
 - **`JSONProcessingException`** — the runtime exception used by generated code and by the parser/writer.
@@ -77,6 +77,10 @@ The runtime — `JSONParser`, `JSONWriter`, `JSONObserver`, `JSONPlan`, `AnyObje
 The only configurable cap is **`maxNestingDepth`** (default **64**, counted across objects and arrays together, checked before recursing). The constructor rejects `maxNestingDepth <= 0` — a 0/negative cap would silently disable the defense. New caps should follow that pattern.
 
 > The earlier `byte[] ⇄ Map` design also had `maxNumberLength` / `maxObjectMembers` / `maxArrayElements` / `allowDuplicateJSONKeys`; those are **not** present in the current parser. (`README.md` still documents the old runtime API and those caps — it is stale.)
+
+#### Raw object capture
+
+`JSONObserver.raw(byte[] src, int start, int end)` is a no-op `default` that `parseObjectBody` calls once per object with the span from its `{` through its `}`. Only companions with a `@JSONRaw` member override it (decoding through `Conversions.rawString`), so non-users pay one empty call and no allocation. Every object body — top level, nested, array element, and polymorphic subtype — routes through `parseObjectBody`, so all four get it.
 
 ### Thread-safety
 

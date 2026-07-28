@@ -10,6 +10,7 @@ import module java.compiler;
 import org.lattejava.json.JSONCatchAll;
 import org.lattejava.json.JSONConstructor;
 import org.lattejava.json.JSONField;
+import org.lattejava.json.JSONRaw;
 
 /** Resolves a class's members: {@code @JSONConstructor} parameters or JavaBean properties. Stateless query object. */
 public final class ClassMemberDiscovery {
@@ -50,7 +51,7 @@ public final class ClassMemberDiscovery {
           continue;
         }
         if (mods.contains(javax.lang.model.element.Modifier.PUBLIC) || f.getAnnotation(JSONField.class) != null
-            || f.getAnnotation(JSONCatchAll.class) != null) {
+            || f.getAnnotation(JSONCatchAll.class) != null || f.getAnnotation(JSONRaw.class) != null) {
           names.add(fn);
         }
       }
@@ -199,13 +200,33 @@ public final class ClassMemberDiscovery {
     Element at = config != null ? config
         : backingField != null ? backingField
         : getter != null ? getter : setter != null ? setter : type;
-    return new BeanProperty(name, tm, config, at, read, write, writeSetter);
+    // @JSONRaw is resolved independently of configElement()'s single first-match priority: a raw property's field,
+    // getter, and setter are physically distinct elements, and @JSONRaw may land on any one of them while a
+    // higher-priority candidate carries @JSONField/@JSONCatchAll instead. Scanning for it (and its two conflicting
+    // annotations) across every candidate, rather than only the one configElement() happens to pick, is what lets
+    // the validator catch the conflict regardless of which candidate carries which annotation.
+    Element raw = firstAnnotated(JSONRaw.class, backingField, getter, isGetter, setter);
+    Element catchAll = firstAnnotated(JSONCatchAll.class, backingField, getter, isGetter, setter);
+    Element field = firstAnnotated(JSONField.class, backingField, getter, isGetter, setter);
+    return new BeanProperty(name, tm, config, at, read, write, writeSetter, raw, catchAll, field);
   }
 
-  /** The first of {@code candidates} bearing @JSONField or @JSONCatchAll, else null. */
+  /** The first of {@code candidates} bearing @JSONField, @JSONCatchAll, or @JSONRaw, else null. */
   private Element configElement(Element... candidates) {
     for (Element e : candidates) {
-      if (e != null && (e.getAnnotation(JSONField.class) != null || e.getAnnotation(JSONCatchAll.class) != null)) {
+      if (e != null && (e.getAnnotation(JSONField.class) != null || e.getAnnotation(JSONCatchAll.class) != null
+          || e.getAnnotation(JSONRaw.class) != null)) {
+        return e;
+      }
+    }
+    return null;
+  }
+
+  /** The first of {@code candidates} bearing {@code annotation}, else null. */
+  private static Element firstAnnotated(Class<? extends java.lang.annotation.Annotation> annotation,
+                                        Element... candidates) {
+    for (Element e : candidates) {
+      if (e != null && e.getAnnotation(annotation) != null) {
         return e;
       }
     }
@@ -227,7 +248,9 @@ public final class ClassMemberDiscovery {
   }
 
   /** A resolved JavaBean property: its name, type, the @JSONField/@JSONCatchAll-bearing element (or null), an element
-   *  to attach errors to, and the read/write accessor facts. */
-  public record BeanProperty(String name, TypeMirror type, Element config, Element at,
-                             String read, String write, boolean writeSetter) {}
+   *  to attach errors to, the read/write accessor facts, and the independently-resolved @JSONRaw/@JSONCatchAll/
+   *  @JSONField elements (each the first candidate bearing that specific annotation, regardless of what {@code
+   *  config} resolved to). */
+  public record BeanProperty(String name, TypeMirror type, Element config, Element at, String read, String write,
+                             boolean writeSetter, Element raw, Element catchAll, Element field) {}
 }

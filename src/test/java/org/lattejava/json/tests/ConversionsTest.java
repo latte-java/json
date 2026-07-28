@@ -56,4 +56,21 @@ public class ConversionsTest {
   public void timeParserInvalidWraps() {
     Conversions.toInstant("nope");
   }
+
+  @Test
+  public void rawStringDecodesASCIISlice() {
+    byte[] src = "xx{\"a\":1}yy".getBytes(StandardCharsets.UTF_8);
+    assertEquals(Conversions.rawString(src, 2, 9), "{\"a\":1}");
+  }
+
+  @Test
+  public void rawStringDecodesMultiByteSlice() {
+    byte[] src = "{\"k\":\"é€漢\"}".getBytes(StandardCharsets.UTF_8);
+    assertEquals(Conversions.rawString(src, 0, src.length), "{\"k\":\"é€漢\"}");
+  }
+
+  @Test
+  public void rawStringOfEmptySliceIsEmpty() {
+    assertEquals(Conversions.rawString("{}".getBytes(StandardCharsets.UTF_8), 1, 1), "");
+  }
 }

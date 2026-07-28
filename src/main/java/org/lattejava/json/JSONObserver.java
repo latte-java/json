@@ -102,6 +102,15 @@ public non-sealed interface JSONObserver<T> extends JSONObjectHandler {
     throw new JSONProcessingException("Unexpected typed dispatch for field [" + field + "]");
   }
 
+  /**
+   * Delivers the verbatim byte span of the JSON object just parsed: {@code src[start]} is its opening brace and
+   * {@code src[end - 1]} its matching closing brace. Called once per object, after the body and before
+   * {@link #finish()}. The default ignores the span; only generated companions with a {@code @JSONRaw} member
+   * override it and decode the slice, so observers that do not want the text pay no allocation.
+   */
+  default void raw(byte[] src, int start, int end) {
+  }
+
   void string(String key, String value);
 
   default void string(int field, String value) {

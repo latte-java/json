@@ -305,6 +305,11 @@
       @template.defaultArm(view = view, value = "value")
     }
   }
+@if(!view.raw().isEmpty())
+  @Override public void raw(byte[] src, int start, int end) {
+    this.${view.raw()} = Conversions.rawString(src, start, end);
+  }
+@endif
   @Override public ${view.simpleName()} finish() {
 @if(view.beanConstructed())
     ${view.simpleName()} value = new ${view.simpleName()}();

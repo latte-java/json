@@ -76,4 +76,22 @@ public class AnnotationDeclarationTest {
     assertTrue(Arrays.asList(target.value()).contains(ElementType.PARAMETER),
         "@JSONCatchAll must target PARAMETER");
   }
+
+  @Test
+  public void jsonRawHasNoAttributes() {
+    assertEquals(JSONRaw.class.getDeclaredMethods().length, 0);
+  }
+
+  @Test
+  public void jsonRawTargetsMembersAndParameters() {
+    var target = JSONRaw.class.getAnnotation(Target.class);
+    assertNotNull(target, "@JSONRaw must declare @Target");
+    assertEquals(Set.of(target.value()),
+        Set.of(ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT));
+  }
+
+  @Test
+  public void jsonRawIsSourceRetained() {
+    assertEquals(JSONRaw.class.getAnnotation(Retention.class).value(), RetentionPolicy.SOURCE);
+  }
 }

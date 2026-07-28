@@ -19,6 +19,21 @@ public final class Conversions {
   private Conversions() {
   }
 
+  /**
+   * Decodes the verbatim JSON slice {@code [start, end)} for a {@code @JSONRaw} member: ISO-8859-1 for a pure-ASCII
+   * slice, UTF-8 otherwise. This mirrors the private {@code JSONParser.stringFrom} helper's handling of unescaped
+   * slices; the ASCII pre-scan is kept here for consistency with that method, not because it is faster than decoding
+   * straight to UTF-8.
+   */
+  public static String rawString(byte[] src, int start, int end) {
+    for (int i = start; i < end; i++) {
+      if (src[i] < 0) {
+        return new String(src, start, end - start, StandardCharsets.UTF_8);
+      }
+    }
+    return new String(src, start, end - start, StandardCharsets.ISO_8859_1);
+  }
+
   public static Duration toDuration(String value) {
     try {
       return Duration.parse(value);

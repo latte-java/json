@@ -10,6 +10,7 @@ import module java.compiler;
 import org.lattejava.json.InstantFormat;
 import org.lattejava.json.JSONCatchAll;
 import org.lattejava.json.JSONField;
+import org.lattejava.json.JSONRaw;
 import org.lattejava.json.JSONSubtype;
 import org.lattejava.json.NamingStrategy;
 import org.lattejava.json.jte.Component;
@@ -105,6 +106,7 @@ public abstract class AbstractValidator {
   protected boolean validateMembers(TypeElement type, List<? extends Element> members) {
     boolean ok = true;
     int catchAllCount = 0;
+    int rawCount = 0;
     NamingStrategy naming = ProcessorFacts.naming(type);
     Map<String, String> wireKeys = new HashMap<>();
     for (Element c : members) {
@@ -118,6 +120,27 @@ public abstract class AbstractValidator {
         }
         if (c.getAnnotation(JSONField.class) != null) {
           error(c, "@JSONCatchAll member [" + c.getSimpleName() + "] cannot also be annotated @JSONField");
+          ok = false;
+        }
+        if (c.getAnnotation(JSONRaw.class) != null) {
+          error(c, "@JSONRaw member [" + c.getSimpleName() + "] cannot also be annotated @JSONCatchAll");
+          ok = false;
+        }
+        continue;
+      }
+      if (c.getAnnotation(JSONRaw.class) != null) {
+        rawCount++;
+        TypeView rt = new TypeView(processingEnv, c.asType());
+        if (!rt.isString()) {
+          error(c, "@JSONRaw member [" + c.getSimpleName() + "] must be of type String but found [" + rt.name() + "]");
+          ok = false;
+        }
+        if (c.getAnnotation(JSONField.class) != null) {
+          error(c, "@JSONRaw member [" + c.getSimpleName() + "] cannot also be annotated @JSONField");
+          ok = false;
+        }
+        if (c.getAnnotation(JSONCatchAll.class) != null) {
+          error(c, "@JSONRaw member [" + c.getSimpleName() + "] cannot also be annotated @JSONCatchAll");
           ok = false;
         }
         continue;
@@ -146,6 +169,11 @@ public abstract class AbstractValidator {
     if (catchAllCount > 1) {
       error(type, "type [" + type.getQualifiedName() + "] declares [" + catchAllCount
           + "] @JSONCatchAll members; at most one is allowed");
+      ok = false;
+    }
+    if (rawCount > 1) {
+      error(type, "type [" + type.getQualifiedName() + "] declares [" + rawCount
+          + "] @JSONRaw members; at most one is allowed");
       ok = false;
     }
     return ok;

@@ -1,0 +1,27 @@
+package demo;
+
+import module org.lattejava.json;
+
+@JSON
+public class BeanField {
+  private String id;
+  @JSONRaw
+  @JSONField(name = "r")
+  private String raw;
+
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public String getRaw() {
+    return raw;
+  }
+
+  public void setRaw(String raw) {
+    this.raw = raw;
+  }
+}

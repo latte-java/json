@@ -447,10 +447,12 @@ public final class JSONParser {
     if (depth > maxNestingDepth) {
       throw error("Maximum nesting depth [" + maxNestingDepth + "] exceeded");
     }
+    int objectStart = pos;
     expect('{');
     skipWhitespace();
     if (pos < len && src[pos] == '}') {
       pos++;
+      target.raw(src, objectStart, pos);
       return;
     }
     boolean dispatchUnknown = target.dispatchUnknown();
@@ -514,7 +516,7 @@ public final class JSONParser {
       if (pos >= len) throw error("Unterminated object");
       byte nc = src[pos];
       if (nc == ',') { pos++; continue; }
-      if (nc == '}') { pos++; return; }
+      if (nc == '}') { pos++; target.raw(src, objectStart, pos); return; }
       throw error("Expected [,] or [}] but found [" + (char) (nc & 0xFF) + "]");
     }
   }

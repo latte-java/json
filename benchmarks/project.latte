@@ -2,6 +2,16 @@
  * Copyright (c) 2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
+
+// Read the version from the parent project.latte so the dependency is declared in one place. {integration} resolves
+// to whatever was last published locally via `latte int` from the repo root.
+def parentLatteText = new File("../project.latte").text
+def versionMatcher = parentLatteText =~ /name:\s*"json"[^)]*version:\s*"([^"]+)"/
+if (!versionMatcher.find()) {
+  fail("Could not extract http version from ../../project.latte")
+}
+def jsonVersion = versionMatcher.group(1)
+
 project(group: "org.lattejava", name: "json-benchmarks", version: "0.1.0", licenses: ["MIT"]) {
   workflow {
     standard()
@@ -9,7 +19,7 @@ project(group: "org.lattejava", name: "json-benchmarks", version: "0.1.0", licen
 
   dependencies {
     group(name: "compile-processors") {
-      dependency(id: "org.lattejava:json:0.3.0-{integration}")
+      dependency(id: "org.lattejava:json:${jsonVersion}-{integration}")
       dependency(id: "org.openjdk.jmh:jmh-generator-annprocess:1.37")
     }
     group(name: "compile") {
