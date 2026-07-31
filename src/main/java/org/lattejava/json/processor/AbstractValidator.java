@@ -158,11 +158,18 @@ public abstract class AbstractValidator {
         ok = false;
       }
       JSONField policy = c.getAnnotation(JSONField.class);
-      if (policy != null && !validatePolicy(c, c.getSimpleName(), policy, new TypeView(processingEnv, c.asType()))) {
+      TypeView mt = new TypeView(processingEnv, c.asType());
+      if (policy != null && !validatePolicy(c, c.getSimpleName(), policy, mt)) {
         ok = false;
         continue;
       }
-      if (!validateType(c, c.getSimpleName(), new TypeView(processingEnv, c.asType()))) {
+      // Mirrors Component.serialize()/deserialize() minus their reader/writer terms; no Component is built yet at
+      // validation time. A record component always has both, and a @JSONConstructor parameter's reader is checked
+      // separately by ClassValidator.validateClass. ignore() cannot reach here alongside asString() — validatePolicy
+      // rejects that pairing above.
+      Direction direction = new Direction(policy == null || !policy.writeOnly(),
+          policy == null || !policy.readOnly());
+      if (!validateType(c, c.getSimpleName(), mt, policy != null && policy.asString(), direction)) {
         ok = false;
       }
     }
@@ -186,8 +193,13 @@ public abstract class AbstractValidator {
       return false;
     }
     if (policy.ignore() && (!policy.name().isEmpty() || !policy.format().isEmpty()
-        || policy.readOnly() || policy.writeOnly() || policy.instant() != InstantFormat.ISO)) {
+        || policy.readOnly() || policy.writeOnly() || policy.instant() != InstantFormat.ISO || policy.asString())) {
       error(at, "@JSONField member [" + name + "] combines ignore with another attribute, which has no effect");
+      return false;
+    }
+    if (policy.asString() && (!policy.format().isEmpty() || policy.instant() != InstantFormat.ISO)) {
+      error(at, "@JSONField member [" + name + "] sets asString with format or instant; those apply to java.time "
+          + "types, which asString cannot be used on");
       return false;
     }
     String typeName = mt.name();
@@ -226,8 +238,50 @@ public abstract class AbstractValidator {
     return true;
   }
 
-  /** Validates that a member's type is serializable (collection/map/element constraints + scalar support). */
-  protected boolean validateType(Element at, CharSequence name, TypeView mt) {
+  /**
+   * Validates the {@code @JSONField(asString)} contract on {@code mt}: an unsupported, non-collection type declaring
+   * the half of the conversion each direction actually uses. The requirement is per-direction because the generated
+   * code is — a member that is never deserialized emits no constructor call, and one that is never serialized emits
+   * no {@code toString()} call, so demanding the unused half would reject types that would have worked.
+   * <p>
+   * This is the only place the opt-in is enforced — {@code TypeView.isStringConvertible()} is structural and would
+   * amount to auto-detection on its own, which is wrong because a single-{@code String} constructor is often not a
+   * parse constructor.
+   */
+  protected boolean validateStringConvertible(Element at, CharSequence name, TypeView mt, Direction direction) {
+    if (mt.isCollection()) {
+      error(at, "@JSONField(asString) on member [" + name + "] cannot be used on collection type [" + mt.name()
+          + "]; it converts the member's own type, not its elements");
+      return false;
+    }
+    if (isSupportedComponentType(mt)) {
+      error(at, "@JSONField(asString) on member [" + name + "] has no effect on type [" + mt.name()
+          + "], which is already supported");
+      return false;
+    }
+    boolean ok = true;
+    if (direction.deserialized() && !mt.hasStringConstructor()) {
+      error(at, "@JSONField(asString) on member [" + name + "] requires type [" + mt.name()
+          + "] to declare a public constructor taking a single String");
+      ok = false;
+    }
+    if (direction.serialized() && !mt.hasDeclaredToString()) {
+      error(at, "@JSONField(asString) on member [" + name + "] requires type [" + mt.name()
+          + "] to declare toString(); the inherited Object.toString() is not a JSON representation");
+      ok = false;
+    }
+    return ok;
+  }
+
+  /**
+   * Validates that a member's type is serializable (collection/map/element constraints + scalar support).
+   * {@code asString} carries the member's {@code @JSONField(asString)} opt-in, which swaps the closed supported-type
+   * list for the string-convertible contract; {@code direction} then decides which half of that contract applies.
+   */
+  protected boolean validateType(Element at, CharSequence name, TypeView mt, boolean asString, Direction direction) {
+    if (asString) {
+      return validateStringConvertible(at, name, mt, direction);
+    }
     if (mt.isCollection()) {
       // dynamic map: Map<String, Object> carries arbitrary JSON values, read/written via the Any* helpers.
       // Only legal as the member's direct type, so it is recognized here, before the recursive walk.
@@ -244,5 +298,12 @@ public abstract class AbstractValidator {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Which directions a member participates in, which decides which half of a per-direction contract it must satisfy.
+   * Derived from {@code @JSONField(readOnly/writeOnly)} and, for a JavaBean property, from which accessors exist.
+   */
+  protected record Direction(boolean serialized, boolean deserialized) {
   }
 }

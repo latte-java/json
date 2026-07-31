@@ -59,7 +59,7 @@
 @for(int i = 0; i < comps.size(); i++)
 @if(comps.get(i).deserialize() && comps.get(i).isFormatted())
       case ${i} -> this.${comps.get(i).name()} = ${comps.get(i).formatterField()}.parse(value, ${comps.get(i).formatType()}::from);
-@elseif(comps.get(i).deserialize() && comps.get(i).type().isStringForm() && !comps.get(i).isEpochInstant())
+@elseif(comps.get(i).deserialize() && (comps.get(i).type().isStringForm() || comps.get(i).type().isStringConvertible()) && !comps.get(i).isEpochInstant())
       case ${i} -> this.${comps.get(i).name()} = @template.fromString(type = comps.get(i).type(), expr = "value");
 @endif
 @endfor
@@ -186,7 +186,7 @@
 @for(Component c : view.typedComponents())
 @if(c.deserialize() && c.isFormatted())
       case "${c.wireKey()}" -> this.${c.name()} = ${c.formatterField()}.parse(value, ${c.formatType()}::from);
-@elseif(c.deserialize() && c.type().isStringForm() && !c.isEpochInstant())
+@elseif(c.deserialize() && (c.type().isStringForm() || c.type().isStringConvertible()) && !c.isEpochInstant())
       case "${c.wireKey()}" -> this.${c.name()} = @template.fromString(type = c.type(), expr = "value");
 @endif
 @endfor

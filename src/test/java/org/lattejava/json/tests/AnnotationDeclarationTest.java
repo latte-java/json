@@ -22,6 +22,7 @@ public class AnnotationDeclarationTest {
   @Test
   public void jsonFieldAnnotationHasExpectedAttributes() throws Exception {
     var ann = JSONField.class;
+    assertEquals(ann.getDeclaredMethod("asString").getDefaultValue(), Boolean.FALSE);
     assertEquals(ann.getDeclaredMethod("format").getDefaultValue(), "");
     assertEquals(ann.getDeclaredMethod("ignore").getDefaultValue(), Boolean.FALSE);
     assertEquals(ann.getDeclaredMethod("name").getDefaultValue(), "");

@@ -38,7 +38,8 @@ public final class TypeView {
    * declaration built recursively (e.g. {@code Map<String, List<demo.Product>>}); for a type with a
    * generated companion (a nested {@code @JSON} record/class or a polymorphic {@code @JSON} interface),
    * the fully-qualified name, so no import is needed and same-simple-name collisions cannot occur; else
-   * the simple name.
+   * the simple name. A string-convertible type is fully qualified for the same reason — it is an arbitrary
+   * user type the companion has no import for.
    */
   public String decl() {
     if (isMap()) {
@@ -47,7 +48,7 @@ public final class TypeView {
     if (isCollection()) {
       return kind() + "<" + element().decl() + ">";
     }
-    return hasCompanion() ? name() : simpleName();
+    return hasCompanion() || isStringConvertible() ? name() : simpleName();
   }
 
   public TypeView element() {
@@ -62,6 +63,48 @@ public final class TypeView {
    */
   public boolean hasCompanion() {
     return isNested() || isPolymorphic();
+  }
+
+  /**
+   * Whether this type or one of its supertypes below {@code java.lang.Object} declares a no-arg {@code toString()}.
+   * This is the serialize half of the string-convertible contract: it rules out the inherited
+   * {@code Object.toString()}, whose {@code demo.Foo@1a2b3c} form is never a JSON representation. It cannot rule out
+   * a <em>record's</em> compiler-generated {@code toString()} ({@code Foo[a=1, b=2]}) — that method is
+   * indistinguishable from a hand-written one through the {@code Elements} API, especially for a type read from a
+   * compiled dependency.
+   */
+  public boolean hasDeclaredToString() {
+    if (type.getKind() != TypeKind.DECLARED) {
+      return false;
+    }
+    Element current = ((javax.lang.model.type.DeclaredType) type).asElement();
+    while (current instanceof TypeElement te && !te.getQualifiedName().contentEquals("java.lang.Object")) {
+      boolean declares = javax.lang.model.util.ElementFilter.methodsIn(te.getEnclosedElements()).stream()
+          .anyMatch(m -> m.getSimpleName().contentEquals("toString") && m.getParameters().isEmpty());
+      if (declares) {
+        return true;
+      }
+      TypeMirror superclass = te.getSuperclass();
+      current = superclass.getKind() == TypeKind.DECLARED
+          ? ((javax.lang.model.type.DeclaredType) superclass).asElement() : null;
+    }
+    return false;
+  }
+
+  /**
+   * Whether this type declares a public constructor taking exactly one {@code String} — the deserialize half of the
+   * string-convertible contract. Constructors survive into the class file, so this holds for a type from a compiled
+   * dependency just as it does for one being compiled.
+   */
+  public boolean hasStringConstructor() {
+    if (type.getKind() != TypeKind.DECLARED) {
+      return false;
+    }
+    Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+    return javax.lang.model.util.ElementFilter.constructorsIn(element.getEnclosedElements()).stream()
+        .anyMatch(c -> c.getModifiers().contains(javax.lang.model.element.Modifier.PUBLIC)
+            && c.getParameters().size() == 1
+            && c.getParameters().getFirst().asType().toString().equals("java.lang.String"));
   }
 
   public boolean isBool() {
@@ -158,6 +201,31 @@ public final class TypeView {
    */
   public boolean isStringForm() {
     return isEnum() || isString() || name().equals("java.util.UUID") || name().startsWith("java.time.");
+  }
+
+  /**
+   * Whether this type is an arbitrary user type carried on the wire as a JSON string via a public single-{@code
+   * String} constructor plus a declared {@code toString()} — the {@code @JSONField(asString)} shape. Deliberately
+   * <em>not</em> folded into {@link #isStringForm()}: that predicate also decides which types are legal {@code Map}
+   * keys, and widening it would make {@code Map<Version, X>} legal as a side effect.
+   * <p>
+   * This test is purely structural — it does not see the {@code @JSONField(asString)} opt-in, which lives on the
+   * member rather than the type. That is safe for the templates because validation runs first and rejects any member
+   * whose type is unsupported without the opt-in, so by codegen time a string-convertible member type is
+   * necessarily one that opted in. It is <em>not</em> safe as a validation input: {@code AbstractValidator} must
+   * check the annotation, or this would become the auto-detection the opt-in exists to avoid.
+   * <p>
+   * Only <em>one</em> half is required here, deliberately. The per-direction requirement is enforced by
+   * {@code AbstractValidator.validateStringConvertible}, and every template arm is already gated on
+   * {@code Component.serialize()}/{@code deserialize()}, so a missing half is never referenced by generated code.
+   * Requiring both would put this out of step with that validator and silently drop the arm for a member whose
+   * type legitimately has only the half it uses — a {@code writeOnly} member with no {@code toString()}, say.
+   */
+  public boolean isStringConvertible() {
+    if (isPrimitive() || isCollection() || isObject() || isNumeric() || isBool() || isStringForm() || hasCompanion()) {
+      return false;
+    }
+    return hasStringConstructor() || hasDeclaredToString();
   }
 
   public TypeView key() {

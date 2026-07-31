@@ -41,7 +41,7 @@ This module is a **compile-time annotation processor**, not a runtime JSON libra
 
 The module `exports org.lattejava.json`, which contains:
 
-- **Annotations** — `@JSON` (type-level; elements `naming`, `omitNulls` default `true`, `strict` default `false`), `@JSONField` (per-member: `name`, `ignore`, `format`, `instant`, `readOnly`, `writeOnly`), `@JSONCatchAll` (one `Map<String, Object>` bucket for unknown keys), `@JSONRaw` (one `String` member receiving the verbatim JSON text of the object being deserialized; deserialize-only, owns no wire key), `@JSONConstructor` (deserialization constructor for non-record classes), `@JSONTypeInfo` (`property` discriminator on a sealed interface) + `@JSONSubtype` (a subtype's discriminator value).
+- **Annotations** — `@JSON` (type-level; elements `naming`, `omitNulls` default `true`, `strict` default `false`), `@JSONField` (per-member: `name`, `ignore`, `format`, `instant`, `readOnly`, `writeOnly`, `asString`), `@JSONCatchAll` (one `Map<String, Object>` bucket for unknown keys), `@JSONRaw` (one `String` member receiving the verbatim JSON text of the object being deserialized; deserialize-only, owns no wire key), `@JSONConstructor` (deserialization constructor for non-record classes), `@JSONTypeInfo` (`property` discriminator on a sealed interface) + `@JSONSubtype` (a subtype's discriminator value).
 - **Enums** — `NamingStrategy` (`IDENTITY`, `CAMEL_CASE`, `SNAKE_CASE`, `KEBAB_CASE`, `PASCAL_CASE`; applied at compile time) and `InstantFormat` (`ISO`, `EPOCH_SECONDS`, `EPOCH_MILLIS`).
 - **`JSONProcessor`** — the processor itself. It owns only round-level guards and a dispatch table; member discovery, validation, helper emission, and companion generation live in `org.lattejava.json.processor.*`.
 - **`JSONProcessingException`** — the runtime exception used by generated code and by the parser/writer.
@@ -86,6 +86,16 @@ The only configurable cap is **`maxNestingDepth`** (default **64**, counted acro
 
 - **`JSONParser` is NOT thread-safe** — it holds per-parse cursor state. Create a new `JSONParser` per parse call (generated companions do exactly this).
 - **`JSONWriter` is thread-confined via a thread-local recycled buffer** (`acquire` → `write` → `finishString`/`finishBytes` → `release`). Buffers larger than 1 MB are not retained.
+
+### String-convertible members (`@JSONField(asString = true)`)
+
+The supported-type list is closed. To bind a type outside it — a third-party type like `org.lattejava.version.Version`, which is neither `@JSON`-annotated nor annotatable across a module boundary — mark the member `@JSONField(asString = true)`. It is then carried as a JSON string, read through the type's **public single-`String` constructor** and written through its **`toString()`**.
+
+This is **opt-in and never inferred**: a single-`String` constructor is frequently not a parse constructor (`new Thread(String)`, `new Exception(String)`), so auto-detection would silently misbind. `TypeView.isStringConvertible()` is a purely structural predicate used by the templates; `AbstractValidator.validateStringConvertible` is the only place the opt-in is enforced. Don't move the annotation check into `TypeView` — that turns the whole thing into the auto-detection it exists to avoid.
+
+Validated at compile time: the type must not already be supported, must not be a collection (`asString` converts the member's own type, not its elements), and must declare whichever half the member's direction uses. The requirement is **per-direction**, because the generated code is: a `readOnly` member (or a getter-only bean property) emits no constructor call and needs only `toString()`; a `writeOnly` member emits no `toString()` call and needs only the constructor. `AbstractValidator.Direction` carries this, derived from `readOnly`/`writeOnly` for records and from accessor presence for beans. Constructor failures are wrapped by `Conversions.fromString` so they surface as `JSONProcessingException` like any other parse failure; `null` binds directly without invoking the constructor.
+
+Known limitation: a **record's** compiler-generated `toString()` (`Foo[a=1, b=2]`) is indistinguishable from a hand-written one through the `Elements` API, so `hasDeclaredToString()` cannot reject it. The check does catch the inherited `Object.toString()`.
 
 ### Type mapping (dynamic / "Any" values)
 

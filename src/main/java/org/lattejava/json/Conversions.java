@@ -8,7 +8,8 @@ import module java.base;
 
 /**
  * String-form parsers for {@code @JSON} component types whose wire form is a JSON string (enums,
- * {@code UUID}, and the ISO-8601 {@code java.time} types). Each method wraps the JDK's
+ * {@code UUID}, the ISO-8601 {@code java.time} types, and {@code @JSONField(asString)} user types). Each method wraps
+ * the JDK's
  * {@link IllegalArgumentException} / {@link java.time.DateTimeException} in
  * {@link JSONProcessingException} so all parse failures share one exception type. Codegen calls these
  * instead of inlining try/catch at every site.
@@ -17,6 +18,21 @@ import module java.base;
  */
 public final class Conversions {
   private Conversions() {
+  }
+
+  /**
+   * Builds a {@code @JSONField(asString)} member's value from its JSON string form. {@code factory} is the target
+   * type's public single-{@code String} constructor, passed by codegen as a {@code Type::new} method reference, and
+   * {@code type} is that type's simple name for the message. Any failure the constructor raises is wrapped in
+   * {@link JSONProcessingException} so an arbitrary user type's parse failure surfaces exactly like a malformed
+   * {@code UUID} or {@code Instant} does.
+   */
+  public static <T> T fromString(Function<String, T> factory, String type, String value) {
+    try {
+      return factory.apply(value);
+    } catch (RuntimeException e) {
+      throw new JSONProcessingException("Value [" + value + "] is not a valid " + type, e);
+    }
   }
 
   /**

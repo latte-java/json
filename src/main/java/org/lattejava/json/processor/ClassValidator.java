@@ -125,7 +125,8 @@ public final class ClassValidator extends AbstractValidator {
         ok = false;
         continue;
       }
-      if (!validateType(p.at(), p.name(), mt)) {
+      if (!validateType(p.at(), p.name(), mt, policy != null && policy.asString(),
+          new Direction(serialized, deserialized))) {
         ok = false;
       }
     }
