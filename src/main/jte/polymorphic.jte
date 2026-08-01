@@ -56,6 +56,15 @@ public final class ${view.companionName()} implements JSONPolymorphicObserver<${
     };
   }
 
+  /** Same JSON as {@link #toJSON}, indented two spaces per level with one member or element per line. */
+  public static String toPrettyString(${view.simpleName()} value) {
+    return switch (value) {
+@for(var s : view.subtypes())
+      case ${s.typeFqn()} v -> ${s.companionFqn()}.toPrettyString(v);
+@endfor
+    };
+  }
+
   /** Writes {@code value} via its subtype companion into {@code w}. Parent companions call this to share one buffer. */
   public static void write(JSONWriter w, ${view.simpleName()} value) {
     switch (value) {

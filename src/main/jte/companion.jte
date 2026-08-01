@@ -66,6 +66,13 @@ public final class ${view.companionName()} implements JSONObserver<${view.simple
     return w.finishBytes();
   }
 
+  /** Same JSON as {@link #toJSON}, indented two spaces per level with one member or element per line. */
+  public static String toPrettyString(${view.simpleName()} value) {
+    JSONWriter w = JSONWriter.acquire(${view.omitNulls()}, true);
+    write(w, value);
+    return w.finishString();
+  }
+
   /** Writes {@code value} as a JSON object into {@code w}. Parent companions call this to share one buffer. */
   public static void write(JSONWriter w, ${view.simpleName()} value) {
     boolean prevOmitNulls = w.omitNulls(${view.omitNulls()});

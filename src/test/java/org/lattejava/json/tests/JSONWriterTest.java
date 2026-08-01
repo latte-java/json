@@ -234,6 +234,123 @@ public class JSONWriterTest {
   }
 
   @Test
+  public void prettyDeepNestingPastSixtyFourLevels() {
+    JSONWriter w = JSONWriter.acquire(true, true);
+    int levels = 70;
+    w.beginObject();
+    for (int i = 0; i < levels; i++) {
+      w.key("n");
+      w.beginObject();
+    }
+    w.string("leaf", "v");
+    for (int i = 0; i < levels; i++) {
+      w.endObject();
+    }
+    w.endObject();
+    String json = w.finishString();
+    assertTrue(json.contains("\n" + " ".repeat(2 * (levels + 1)) + "\"leaf\": \"v\"\n"), json);
+    assertTrue(json.endsWith("\n  }\n}"), json);
+  }
+
+  @Test
+  public void prettyEmptyContainersStayInline() {
+    JSONWriter w = JSONWriter.acquire(true, true);
+    w.beginObject();
+    w.endObject();
+    assertEquals(w.finishString(), "{}");
+
+    w = JSONWriter.acquire(true, true);
+    w.beginObject();
+    w.key("a");
+    w.beginArray();
+    w.endArray();
+    w.key("o");
+    w.beginObject();
+    w.endObject();
+    w.endObject();
+    assertEquals(w.finishString(), """
+        {
+          "a": [],
+          "o": {}
+        }""");
+  }
+
+  @Test
+  public void prettyIndentsAnyMapsAndLists() {
+    JSONWriter w = JSONWriter.acquire(true, true);
+    w.beginObject();
+    w.any("map", new LinkedHashMap<>(Map.of("inner", 1L)));
+    w.any("list", List.of("a", 2L));
+    w.endObject();
+    assertEquals(w.finishString(), """
+        {
+          "map": {
+            "inner": 1
+          },
+          "list": [
+            "a",
+            2
+          ]
+        }""");
+  }
+
+  @Test
+  public void prettyIndentsNestedObjectsAndArraysWithTwoSpaces() {
+    JSONWriter w = JSONWriter.acquire(true, true);
+    w.beginObject();
+    w.string("name", "outer");
+    w.key("inner");
+    w.beginObject();
+    w.integer("i", 1L);
+    w.endObject();
+    w.key("list");
+    w.beginArray();
+    w.stringElement("x");
+    w.nullElement();
+    w.beginObject();
+    w.integer("i", 2L);
+    w.endObject();
+    w.endArray();
+    w.string("after", "z");
+    w.endObject();
+    assertEquals(w.finishString(), """
+        {
+          "name": "outer",
+          "inner": {
+            "i": 1
+          },
+          "list": [
+            "x",
+            null,
+            {
+              "i": 2
+            }
+          ],
+          "after": "z"
+        }""");
+  }
+
+  @Test
+  public void prettyOmittedNullsLeaveNoDanglingSeparators() {
+    JSONWriter w = JSONWriter.acquire(true, true);
+    w.beginObject();
+    w.string("gone", null);
+    w.string("kept", "v");
+    w.nullValue("alsoGone");
+    w.endObject();
+    assertEquals(w.finishString(), """
+        {
+          "kept": "v"
+        }""");
+
+    JSONWriter allOmitted = JSONWriter.acquire(true, true);
+    allOmitted.beginObject();
+    allOmitted.string("gone", null);
+    allOmitted.endObject();
+    assertEquals(allOmitted.finishString(), "{}");
+  }
+
+  @Test
   public void doubleFormattingMatchesBigDecimalPlainString() {
     double[] values = {0.0, -0.0, 1.0, -1.0, 0.1, 0.25, 2.5, 1234.5678, -987.125, 1e-3, 9999999.0,
         1e7, 1e20, 4.9e-324, 1.7976931348623157e308, 0.001003009027081244, 1.0 / 3.0};

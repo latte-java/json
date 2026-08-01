@@ -53,12 +53,15 @@ For a type `Foo`, the processor generates **`FooJSON`** (in `Foo`'s `.internal` 
 ```java
 String  FooJSON.toJSON(Foo value)               // → JSON String
 byte[]  FooJSON.toJSONBytes(Foo value)          // → UTF-8 bytes
+String  FooJSON.toPrettyString(Foo value)       // → JSON String, indented two spaces per level
 Foo     FooJSON.fromJSON(String json)
 Foo     FooJSON.fromJSON(byte[] json)
 void    FooJSON.write(JSONWriter w, Foo value)  // shared-buffer path nested companions call
 ```
 
 `FooJSON implements JSONObserver<Foo>`, so deserialization is observer-driven. Records, classes (via `@JSONConstructor` or bean accessors), and sealed `@JSONTypeInfo` hierarchies are all supported. Companions are rendered from JTE templates under `src/main/jte/*.jte`.
+
+`toPrettyString` is the same JSON as `toJSON`, only formatted: it acquires the writer with `JSONWriter.acquire(omitNulls, true)`. Indentation is fixed at two spaces and is not configurable — the whole feature is a flag on the writer, so nested companions sharing the buffer inherit it and every path that writes structure (nested companions, `JSONPlan` collections, `@JSONCatchAll` spreads) formats without knowing about the mode.
 
 ### Runtime helpers and the `.internal` copy
 

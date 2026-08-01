@@ -22,6 +22,7 @@ import module java.base;
  *
  * @author Brian Pontarelli
  */
+@SuppressWarnings({"UnusedReturnValue", "unused"})
 public final class JSONWriter {
   private static final ThreadLocal<JSONWriter> CACHED = ThreadLocal.withInitial(JSONWriter::new);
   private static final char[] HEX = "0123456789abcdef".toCharArray();
@@ -45,11 +46,22 @@ public final class JSONWriter {
   private boolean omitNulls = true;
   private boolean pendingValue;
   private int pos;
+  private boolean pretty;
 
   private JSONWriter() {
   }
 
+  /** Acquires a writer that emits compact JSON. */
   public static JSONWriter acquire(boolean omitNulls) {
+    return acquire(omitNulls, false);
+  }
+
+  /**
+   * Acquires a writer, optionally in pretty mode: each member and array element on its own line, indented
+   * two spaces per level, with a space after every member colon. Empty objects and arrays stay inline as
+   * {@code {}} and {@code []}. The flag lives on the writer, so nested companions sharing the buffer inherit it.
+   */
+  public static JSONWriter acquire(boolean omitNulls, boolean pretty) {
     JSONWriter w = CACHED.get();
     if (w.inUse) {
       w = new JSONWriter();
@@ -57,6 +69,7 @@ public final class JSONWriter {
     w.inUse = true;
     w.omitNulls = omitNulls;
     w.pendingValue = false;
+    w.pretty = pretty;
     w.depth = 0;
     w.pos = 0;
     return w;
@@ -207,7 +220,7 @@ public final class JSONWriter {
       return nullValue(key);
     }
     writeKey(key);
-    writeDouble(value.doubleValue());
+    writeDouble(value);
     return this;
   }
 
@@ -251,6 +264,9 @@ public final class JSONWriter {
 
   public JSONWriter endArray() {
     depth--;
+    if (pretty) {
+      closeIndent();
+    }
     ensure(1);
     buf[pos++] = ']';
     return this;
@@ -258,6 +274,9 @@ public final class JSONWriter {
 
   public JSONWriter endObject() {
     depth--;
+    if (pretty) {
+      closeIndent();
+    }
     ensure(1);
     buf[pos++] = '}';
     return this;
@@ -391,6 +410,19 @@ public final class JSONWriter {
     return this;
   }
 
+  /**
+   * Writes the newline and indent that precede a container's closing byte in pretty mode. Call after
+   * {@code depth} has been decremented. A container that is still holding its own first-element bit never
+   * had a member or element clear it, so it is empty and stays inline as {@code {}} / {@code []}.
+   */
+  private void closeIndent() {
+    int idx = depth >> 6;
+    if ((firstBits[idx] & (1L << (depth & 63))) != 0) {
+      return;
+    }
+    newlineIndent(depth);
+  }
+
   private void ensure(int needed) {
     // Compute the requirement in long so a large output can't wrap pos + needed into a negative int
     // and silently skip the grow (which would later index past the buffer). Growth doubles but is
@@ -403,6 +435,15 @@ public final class JSONWriter {
       throw new JSONProcessingException("JSON output exceeds the maximum supported size [" + MAX_CAPACITY + " bytes]");
     }
     buf = Arrays.copyOf(buf, (int) Math.min(Math.max((long) buf.length << 1, required), MAX_CAPACITY));
+  }
+
+  /** Writes a newline followed by two spaces per {@code level} of nesting. */
+  private void newlineIndent(int level) {
+    int spaces = level << 1;
+    ensure(1 + spaces);
+    buf[pos++] = '\n';
+    Arrays.fill(buf, pos, pos + spaces, (byte) ' ');
+    pos += spaces;
   }
 
   private void push() {
@@ -437,6 +478,9 @@ public final class JSONWriter {
     } else {
       ensure(1);
       buf[pos++] = ',';
+    }
+    if (pretty) {
+      newlineIndent(depth);
     }
   }
 
@@ -590,9 +634,15 @@ public final class JSONWriter {
       ensure(1);
       buf[pos++] = ',';
     }
+    if (pretty) {
+      newlineIndent(depth);
+    }
     writeStringValue(key);
-    ensure(1);
+    ensure(2);
     buf[pos++] = ':';
+    if (pretty) {
+      buf[pos++] = ' ';
+    }
   }
 
   private void writeLong(long value) {

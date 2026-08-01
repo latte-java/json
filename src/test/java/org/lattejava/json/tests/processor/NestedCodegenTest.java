@@ -31,6 +31,52 @@ public class NestedCodegenTest {
   }
 
   @Test
+  public void toPrettyStringIndentsNestedCompanionsAndCollections() throws Exception {
+    try (var loader = (URLClassLoader) nested.loader()) {
+      Class<?> userJson = loader.loadClass("demo.internal.UserJSON");
+      Class<?> user = loader.loadClass("demo.User");
+      String json = "{\"name\":\"Bob\",\"address\":{\"street\":\"1 Main\",\"city\":\"Denver\","
+          + "\"geo\":{\"lat\":1.5,\"lng\":2.5}},"
+          + "\"prior\":[{\"street\":\"2 Oak\",\"city\":\"Boulder\",\"geo\":{\"lat\":3.0,\"lng\":4.0}}],"
+          + "\"seen\":[],\"byType\":{\"HOME\":{\"street\":\"3 Pine\",\"city\":\"Aspen\",\"geo\":{\"lat\":5.0,\"lng\":6.0}}}}";
+      Object o = userJson.getMethod("fromJSON", String.class).invoke(null, json);
+      assertEquals(userJson.getMethod("toPrettyString", user).invoke(null, o), """
+          {
+            "name": "Bob",
+            "address": {
+              "street": "1 Main",
+              "city": "Denver",
+              "geo": {
+                "lat": 1.5,
+                "lng": 2.5
+              }
+            },
+            "prior": [
+              {
+                "street": "2 Oak",
+                "city": "Boulder",
+                "geo": {
+                  "lat": 3.0,
+                  "lng": 4.0
+                }
+              }
+            ],
+            "seen": [],
+            "byType": {
+              "HOME": {
+                "street": "3 Pine",
+                "city": "Aspen",
+                "geo": {
+                  "lat": 5.0,
+                  "lng": 6.0
+                }
+              }
+            }
+          }""");
+    }
+  }
+
+  @Test
   public void listOfNestedRoundTrips() throws Exception {
     try (var loader = (URLClassLoader) nested.loader()) {
       Class<?> userJson = loader.loadClass("demo.internal.UserJSON");

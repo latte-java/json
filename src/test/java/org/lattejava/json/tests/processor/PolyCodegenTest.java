@@ -53,6 +53,22 @@ public class PolyCodegenTest {
   }
 
   @Test
+  public void toPrettyStringDelegatesToTheSubtypeCompanion() throws Exception {
+    try (var loader = (URLClassLoader) poly.loader()) {
+      Class<?> petJson = loader.loadClass("demo.internal.PetJSON");
+      Class<?> pet = loader.loadClass("demo.Pet");
+      Object dog = petJson.getMethod("fromJSON", String.class)
+          .invoke(null, "{\"petType\":\"Dog\",\"name\":\"Rex\",\"packSize\":3}");
+      assertEquals(petJson.getMethod("toPrettyString", pet).invoke(null, dog), """
+          {
+            "petType": "Dog",
+            "name": "Rex",
+            "packSize": 3
+          }""");
+    }
+  }
+
+  @Test
   public void toJSONBytesMatchesToJSON() throws Exception {
     try (var loader = (URLClassLoader) poly.loader()) {
       Class<?> petJson = loader.loadClass("demo.internal.PetJSON");
